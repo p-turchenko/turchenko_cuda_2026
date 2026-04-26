@@ -1,0 +1,94 @@
+attributes(global) subroutine vec_add(a, b, c, n)
+    implicit none
+    real(8), device :: a(*), b(*), c(*)
+    integer, value :: n
+    integer :: idx
+
+    idx = threadIdx%x + (blockIdx%x - 1) * blockDim%x
+
+    if (idx <= n) then
+        c(idx) = a(idx) + b(idx)
+    end if
+end subroutine vec_add
+
+
+program rowl_plus_rowl_gpu
+    use cudafor
+    implicit none
+
+    integer :: l, i
+    real(8), allocatable :: A(:), B(:), C(:)
+    real(8), device, allocatable :: dA(:), dB(:), dC(:)
+    character(len=100) :: filename
+    integer :: unit
+    integer :: threads, blocks
+
+    integer :: count_rate, count_max
+    integer :: t1, t2
+    integer :: ierr   ! ✔ FIX: должен быть ДО executable code
+
+    print *, "Enter vector length l:"
+    read *, l
+
+    if (l <= 0) then
+        print *, "Invalid l"
+        stop
+    end if
+
+    allocate(A(l), B(l), C(l))
+    allocate(dA(l), dB(l), dC(l))
+
+    call random_seed()
+
+    do i = 1, l
+        call random_number(A(i))
+        call random_number(B(i))
+    end do
+
+    dA = A
+    dB = B
+
+    threads = 256
+    blocks = (l + threads - 1) / threads
+
+    call system_clock(t1, count_rate, count_max)
+
+    call vec_add<<<blocks, threads>>>(dA, dB, dC, l)
+
+    ierr = cudaDeviceSynchronize()   ! ✔ FIX: call → assignment
+
+    call system_clock(t2, count_rate, count_max)
+
+    C = dC
+
+    filename = "rowl_plus_rowl_gpu.out"
+    open(newunit=unit, file=filename, status="replace", action="write")
+
+    write(unit,*) "l =", l
+
+    write(unit,*) "Vector A:"
+    do i = 1, l
+        write(unit,*) A(i)
+    end do
+
+    write(unit,*) "Vector B:"
+    do i = 1, l
+        write(unit,*) B(i)
+    end do
+
+    write(unit,*) "Vector C = A + B:"
+    do i = 1, l
+        write(unit,*) C(i)
+    end do
+
+    write(unit,*) "Time (s): ", real(t2 - t1) / count_rate
+    write(unit,*) "GFLOPS: ", dble(l) / (real(t2 - t1) / count_rate) / 1.0d9
+
+    close(unit)
+
+    print *, "Done. Output written to ", filename
+
+    deallocate(A, B, C)
+    deallocate(dA, dB, dC)
+
+end program rowl_plus_rowl_gpu

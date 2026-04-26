@@ -21,3 +21,5 @@
 7=rowl_plus_rowl_cpu
 8=columnk_plus_columnk_cpu.f90
 9=matrixkl_plus_matrixkl_cpu.f90
+10=rowl_plus_rowl_gpu.f90
+11=rowl_plus_rowl_gpu.cuf

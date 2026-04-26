@@ -94,3 +94,21 @@ mc
 gfortran matrixkl_plus_matrixkl_cpu.f90 -O3 -o matrixkl_plus_matrixkl_cpu_cpu
 ./matrixkl_plus_matrixkl_cpu_cpu
 mc
+gfortran matrixkl_plus_matrixkl_cpu.f90 -O3 -o matrixkl_plus_matrixkl_cpu
+./matrixkl_plus_matrixkl_cpu
+git add .
+git commit -m "Сложение матриц k на l на cpu"
+git push -f origin main
+mc
+mc
+rowl_plus_rowl_gpu.f90 -O3 -o rowl_plus_rowl_gpu
+rowl_plus_rowl_gpu.cuf -O3 -o rowl_plus_rowl_gpu
+nvfortran -O3 -cuda -cudalib=cublas -gpu=cc80 rowl_plus_rowl_gpu.cuf -o rowl_plus_rowl_gpu
+mc
+mc
+nvfortran -O3 -cuda -cudalib=cublas -gpu=cc80 rowl_plus_rowl_gpu.cuf -o rowl_plus_rowl_gpu
+nvfortran -O3 -cuda -cudalib=cublas -gpu=cc80 rowl_plus_rowl_gpu.cuf -o rowl_plus_rowl_gpu.exe
+
+~
+nvfortran -O3 -cuda -cudalib=cublas -gpu=cc80 rowl_plus_rowl_gpu.cuf -o rowl_plus_rowl_gpu
+mc
