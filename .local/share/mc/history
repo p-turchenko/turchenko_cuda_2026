@@ -1,0 +1,16 @@
+[input-def]
+0=*
+
+[inpmc.fm.mkdir]
+0=1
+1=zZz
+
+[mc.esc.timeout]
+0=1000000
+
+[input2]
+0=1l+1l_l=10in7
+1=1l+1l_l=10in7.f90
+2=/home2/st085140/1/zZz
+3=/home2/st085140/1/
+4=1l+1l_cpu.f90
