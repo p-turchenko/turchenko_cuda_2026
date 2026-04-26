@@ -85,3 +85,12 @@ git commit -m "Сверхпервый пуш"
 git push -f origin main
 mc
 mc
+gfortran columnk_plus_columnk_cpu.f90 -O3 -o columnk_plus_columnk_cpu
+./columnk_plus_columnk_cpu
+git add .
+git commit -m "Сложение столбцов высоты k"
+git push -f origin main
+mc
+gfortran matrixkl_plus_matrixkl_cpu.f90 -O3 -o matrixkl_plus_matrixkl_cpu_cpu
+./matrixkl_plus_matrixkl_cpu_cpu
+mc

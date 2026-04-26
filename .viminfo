@@ -15,7 +15,7 @@ $
 
 # Command Line History (newest to oldest):
 :wq
-|2,0,1777244661,,"wq"
+|2,0,1777245213,,"wq"
 :q
 |2,0,1777244329,,"q"
 :q!
@@ -38,31 +38,31 @@ $
 	
 |3,0,0,1,1,0,1777244327,""
 ""1	LINE	0
-	program rowl_plus_rowl_cpu
+	program columnk_plus_columnk_cpu
 	    implicit none
 	
-	    integer :: l, i
+	    integer :: k, i
 	    real(8), allocatable :: A(:), B(:), C(:)
 	    real(8) :: t1, t2
 	    character(len=100) :: filename
 	    integer :: unit
 	
-	    ! ===== ввод l =====
-	    print *, "Enter vector length l:"
-	    read *, l
+	    ! ===== ввод k =====
+	    print *, "Enter vector length k:"
+	    read *, k
 	
-	    if (l <= 0) then
-	        print *, "Invalid l"
+	    if (k <= 0) then
+	        print *, "Invalid k"
 	        stop
 	    end if
 	
 	    ! ===== аллокация =====
-	    allocate(A(l), B(l), C(l))
+	    allocate(A(k), B(k), C(k))
 	
 	    ! ===== генерация случайных чисел =====
 	    call random_seed()
 	
-	    do i = 1, l
+	    do i = 1, k
 	        call random_number(A(i))
 	        call random_number(B(i))
 	    end do
@@ -71,7 +71,7 @@ $
 	    call cpu_time(t1)
 	
 	    ! ===== сложение =====
-	    do i = 1, l
+	    do i = 1, k
 	        C(i) = A(i) + B(i)
 	    end do
 	
@@ -79,18 +79,18 @@ $
 	    call cpu_time(t2)
 	
 	    ! ===== output файл =====
-	    filename = "rowl_plus_rowl_cpu.out"
+	    filename = "columnk_plus_columnk_cpu.out"
 	    open(newunit=unit, file=filename, status="replace", action="write")
 	
-	    write(unit,*) "l =", l
+	    write(unit,*) "k =", k
 	
 	    write(unit,*) "Vector A:"
-	    do i = 1, l
+	    do i = 1, k
 	        write(unit,*) A(i)
 	    end do
-|3,1,1,1,50,0,1777244565,"program rowl_plus_rowl_cpu","    implicit none","","    integer :: l, i","    real(8), allocatable :: A(:), B(:), C(:)","    real(8) :: t1, t2","    character(len=100) :: filename","    integer :: unit","","    ! ===== ввод l =====","    print *, \"Enter vector length l:\"","    read *, l","","    if (l <= 0) then","        print *, \"Invalid l\"","        stop","    end if","","    ! ===== аллокация =====",>32
-|<"    allocate(A(l), B(l), C(l))","","    ! ===== генерация случайных чисел =====","    call random_seed()","","    do i = 1, l","        call random_number(A(i))","        call random_number(B(i))","    end do","","    ! ===== таймер старт =====","    call cpu_time(t1)","","    ! ===== сложение =====","    do i = 1, l","        C(i) = A(i) + B(i)","    end do","","    ! ===== таймер стоп =====","    call cpu_time(t2)","",>35
-|<"    ! ===== output файл =====","    filename = \"rowl_plus_rowl_cpu.out\"","    open(newunit=unit, file=filename, status=\"replace\", action=\"write\")","","    write(unit,*) \"l =\", l","","    write(unit,*) \"Vector A:\"","    do i = 1, l","        write(unit,*) A(i)","    end do"
+|3,1,1,1,50,0,1777244976,"program columnk_plus_columnk_cpu","    implicit none","","    integer :: k, i","    real(8), allocatable :: A(:), B(:), C(:)","    real(8) :: t1, t2","    character(len=100) :: filename","    integer :: unit","","    ! ===== ввод k =====","    print *, \"Enter vector length k:\"","    read *, k","","    if (k <= 0) then","        print *, \"Invalid k\"","        stop","    end if","","    ! ===== аллокация =====",>32
+|<"    allocate(A(k), B(k), C(k))","","    ! ===== генерация случайных чисел =====","    call random_seed()","","    do i = 1, k","        call random_number(A(i))","        call random_number(B(i))","    end do","","    ! ===== таймер старт =====","    call cpu_time(t1)","","    ! ===== сложение =====","    do i = 1, k","        C(i) = A(i) + B(i)","    end do","","    ! ===== таймер стоп =====","    call cpu_time(t2)","",>35
+|<"    ! ===== output файл =====","    filename = \"columnk_plus_columnk_cpu.out\"","    open(newunit=unit, file=filename, status=\"replace\", action=\"write\")","","    write(unit,*) \"k =\", k","","    write(unit,*) \"Vector A:\"","    do i = 1, k","        write(unit,*) A(i)","    end do"
 "2	LINE	0
 	program rowl_plus_rowl_cpu
 	    implicit none
@@ -142,14 +142,68 @@ $
 	    do i = 1, l
 	        write(unit,*) A(i)
 	    end do
-|3,0,2,1,50,0,1777244509,"program rowl_plus_rowl_cpu","    implicit none","","    integer :: l, i","    real(8), allocatable :: A(:), B(:), C(:)","    real(8) :: t1, t2","    character(len=100) :: filename","    integer :: unit","","    ! ===== ввод l =====","    print *, \"Enter vector length l:\"","    read *, l","","    if (l <= 0) then","        print *, \"Invalid l\"","        stop","    end if","","    ! ===== аллокация =====",>32
+|3,0,2,1,50,0,1777244565,"program rowl_plus_rowl_cpu","    implicit none","","    integer :: l, i","    real(8), allocatable :: A(:), B(:), C(:)","    real(8) :: t1, t2","    character(len=100) :: filename","    integer :: unit","","    ! ===== ввод l =====","    print *, \"Enter vector length l:\"","    read *, l","","    if (l <= 0) then","        print *, \"Invalid l\"","        stop","    end if","","    ! ===== аллокация =====",>32
 |<"    allocate(A(l), B(l), C(l))","","    ! ===== генерация случайных чисел =====","    call random_seed()","","    do i = 1, l","        call random_number(A(i))","        call random_number(B(i))","    end do","","    ! ===== таймер старт =====","    call cpu_time(t1)","","    ! ===== сложение =====","    do i = 1, l","        C(i) = A(i) + B(i)","    end do","","    ! ===== таймер стоп =====","    call cpu_time(t2)","",>35
 |<"    ! ===== output файл =====","    filename = \"rowl_plus_rowl_cpu.out\"","    open(newunit=unit, file=filename, status=\"replace\", action=\"write\")","","    write(unit,*) \"l =\", l","","    write(unit,*) \"Vector A:\"","    do i = 1, l","        write(unit,*) A(i)","    end do"
-"3	CHAR	0
+"3	LINE	0
+	program rowl_plus_rowl_cpu
+	    implicit none
+	
+	    integer :: l, i
+	    real(8), allocatable :: A(:), B(:), C(:)
+	    real(8) :: t1, t2
+	    character(len=100) :: filename
+	    integer :: unit
+	
+	    ! ===== ввод l =====
+	    print *, "Enter vector length l:"
+	    read *, l
+	
+	    if (l <= 0) then
+	        print *, "Invalid l"
+	        stop
+	    end if
+	
+	    ! ===== аллокация =====
+	    allocate(A(l), B(l), C(l))
+	
+	    ! ===== генерация случайных чисел =====
+	    call random_seed()
+	
+	    do i = 1, l
+	        call random_number(A(i))
+	        call random_number(B(i))
+	    end do
+	
+	    ! ===== таймер старт =====
+	    call cpu_time(t1)
+	
+	    ! ===== сложение =====
+	    do i = 1, l
+	        C(i) = A(i) + B(i)
+	    end do
+	
+	    ! ===== таймер стоп =====
+	    call cpu_time(t2)
+	
+	    ! ===== output файл =====
+	    filename = "rowl_plus_rowl_cpu.out"
+	    open(newunit=unit, file=filename, status="replace", action="write")
+	
+	    write(unit,*) "l =", l
+	
+	    write(unit,*) "Vector A:"
+	    do i = 1, l
+	        write(unit,*) A(i)
+	    end do
+|3,0,3,1,50,0,1777244509,"program rowl_plus_rowl_cpu","    implicit none","","    integer :: l, i","    real(8), allocatable :: A(:), B(:), C(:)","    real(8) :: t1, t2","    character(len=100) :: filename","    integer :: unit","","    ! ===== ввод l =====","    print *, \"Enter vector length l:\"","    read *, l","","    if (l <= 0) then","        print *, \"Invalid l\"","        stop","    end if","","    ! ===== аллокация =====",>32
+|<"    allocate(A(l), B(l), C(l))","","    ! ===== генерация случайных чисел =====","    call random_seed()","","    do i = 1, l","        call random_number(A(i))","        call random_number(B(i))","    end do","","    ! ===== таймер старт =====","    call cpu_time(t1)","","    ! ===== сложение =====","    do i = 1, l","        C(i) = A(i) + B(i)","    end do","","    ! ===== таймер стоп =====","    call cpu_time(t2)","",>35
+|<"    ! ===== output файл =====","    filename = \"rowl_plus_rowl_cpu.out\"","    open(newunit=unit, file=filename, status=\"replace\", action=\"write\")","","    write(unit,*) \"l =\", l","","    write(unit,*) \"Vector A:\"","    do i = 1, l","        write(unit,*) A(i)","    end do"
+"4	CHAR	0
 	
 	
-|3,0,3,0,2,0,1777243722,"",""
-"4	LINE	0
+|3,0,4,0,2,0,1777243722,"",""
+"5	LINE	0
 	
 	    integer :: i
 	    real(8) :: t1, t2
@@ -169,45 +223,89 @@ $
 	    do i = 1, l
 	        C(i) = A(i) + B(i)
 	    end do
-|3,0,4,1,19,0,1777239974,"","    integer :: i","    real(8) :: t1, t2","","    allocate(A(l), B(l), C(l))","","    ! Инициализация","    do i = 1, l","        A(i) = 1.0d0","        B(i) = 2.0d0","    end do","","    ! Таймер старт","    call cpu_time(t1)","","    ! Сложение","    do i = 1, l","        C(i) = A(i) + B(i)","    end do"
+|3,0,5,1,19,0,1777239974,"","    integer :: i","    real(8) :: t1, t2","","    allocate(A(l), B(l), C(l))","","    ! Инициализация","    do i = 1, l","        A(i) = 1.0d0","        B(i) = 2.0d0","    end do","","    ! Таймер старт","    call cpu_time(t1)","","    ! Сложение","    do i = 1, l","        C(i) = A(i) + B(i)","    end do"
 "-	CHAR	0
 	
 	
 |3,0,36,0,2,0,1777243722,"",""
 
 # File marks:
-'0  42  22  ~/1/columnk_plus_columnk_cpu.f90
-|4,48,42,22,1777244661,"~/1/columnk_plus_columnk_cpu.f90"
-'1  1  27  ~/1/columnk_plus_columnk_cpu.f90
-|4,49,1,27,1777244583,"~/1/columnk_plus_columnk_cpu.f90"
-'2  1  27  ~/1/columnk_plus_columnk_cpu.f90
-|4,50,1,27,1777244583,"~/1/columnk_plus_columnk_cpu.f90"
-'3  2  15  ~/1/columnk_plus_columnk_cpu.f90
-|4,51,2,15,1777244521,"~/1/columnk_plus_columnk_cpu.f90"
-'4  2  15  ~/1/columnk_plus_columnk_cpu.f90
-|4,52,2,15,1777244521,"~/1/columnk_plus_columnk_cpu.f90"
-'5  8  0  ~/1/11
-|4,53,8,0,1777244329,"~/1/11"
-'6  42  38  ~/1/rowl_plus_rowl_cpu.f90
-|4,54,42,38,1777243738,"~/1/rowl_plus_rowl_cpu.f90"
-'7  42  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,55,42,0,1777243729,"~/1/rowl_plus_rowl_cpu.f90"
-'8  70  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,56,70,0,1777243618,"~/1/rowl_plus_rowl_cpu.f90"
-'9  71  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,57,71,0,1777243618,"~/1/rowl_plus_rowl_cpu.f90"
+'0  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
+|4,48,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
+'1  76  37  ~/1/matrixkl_plus_matrixkl_cpu.f90
+|4,49,76,37,1777244984,"~/1/matrixkl_plus_matrixkl_cpu.f90"
+'2  76  37  ~/1/matrixkl_plus_matrixkl_cpu.f90
+|4,50,76,37,1777244984,"~/1/matrixkl_plus_matrixkl_cpu.f90"
+'3  42  22  ~/1/columnk_plus_columnk_cpu.f90
+|4,51,42,22,1777244661,"~/1/columnk_plus_columnk_cpu.f90"
+'4  1  27  ~/1/columnk_plus_columnk_cpu.f90
+|4,52,1,27,1777244583,"~/1/columnk_plus_columnk_cpu.f90"
+'5  1  27  ~/1/columnk_plus_columnk_cpu.f90
+|4,53,1,27,1777244583,"~/1/columnk_plus_columnk_cpu.f90"
+'6  2  15  ~/1/columnk_plus_columnk_cpu.f90
+|4,54,2,15,1777244521,"~/1/columnk_plus_columnk_cpu.f90"
+'7  2  15  ~/1/columnk_plus_columnk_cpu.f90
+|4,55,2,15,1777244521,"~/1/columnk_plus_columnk_cpu.f90"
+'8  8  0  ~/1/11
+|4,56,8,0,1777244329,"~/1/11"
+'9  42  38  ~/1/rowl_plus_rowl_cpu.f90
+|4,57,42,38,1777243738,"~/1/rowl_plus_rowl_cpu.f90"
 
 # Jumplist (newest first):
+-'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
+|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
+-'  76  37  ~/1/matrixkl_plus_matrixkl_cpu.f90
+|4,39,76,37,1777245162,"~/1/matrixkl_plus_matrixkl_cpu.f90"
+-'  76  37  ~/1/matrixkl_plus_matrixkl_cpu.f90
+|4,39,76,37,1777244984,"~/1/matrixkl_plus_matrixkl_cpu.f90"
+-'  1  0  ~/1/matrixkl_plus_matrixkl_cpu.f90
+|4,39,1,0,1777244974,"~/1/matrixkl_plus_matrixkl_cpu.f90"
+-'  42  22  ~/1/columnk_plus_columnk_cpu.f90
+|4,39,42,22,1777244661,"~/1/columnk_plus_columnk_cpu.f90"
+-'  42  22  ~/1/columnk_plus_columnk_cpu.f90
+|4,39,42,22,1777244661,"~/1/columnk_plus_columnk_cpu.f90"
+-'  42  22  ~/1/columnk_plus_columnk_cpu.f90
+|4,39,42,22,1777244661,"~/1/columnk_plus_columnk_cpu.f90"
 -'  42  22  ~/1/columnk_plus_columnk_cpu.f90
 |4,39,42,22,1777244661,"~/1/columnk_plus_columnk_cpu.f90"
 -'  1  27  ~/1/columnk_plus_columnk_cpu.f90
 |4,39,1,27,1777244647,"~/1/columnk_plus_columnk_cpu.f90"
+-'  1  27  ~/1/columnk_plus_columnk_cpu.f90
+|4,39,1,27,1777244647,"~/1/columnk_plus_columnk_cpu.f90"
+-'  1  27  ~/1/columnk_plus_columnk_cpu.f90
+|4,39,1,27,1777244647,"~/1/columnk_plus_columnk_cpu.f90"
+-'  1  27  ~/1/columnk_plus_columnk_cpu.f90
+|4,39,1,27,1777244647,"~/1/columnk_plus_columnk_cpu.f90"
+-'  1  27  ~/1/columnk_plus_columnk_cpu.f90
+|4,39,1,27,1777244583,"~/1/columnk_plus_columnk_cpu.f90"
+-'  1  27  ~/1/columnk_plus_columnk_cpu.f90
+|4,39,1,27,1777244583,"~/1/columnk_plus_columnk_cpu.f90"
+-'  1  27  ~/1/columnk_plus_columnk_cpu.f90
+|4,39,1,27,1777244583,"~/1/columnk_plus_columnk_cpu.f90"
 -'  1  27  ~/1/columnk_plus_columnk_cpu.f90
 |4,39,1,27,1777244583,"~/1/columnk_plus_columnk_cpu.f90"
 -'  2  15  ~/1/columnk_plus_columnk_cpu.f90
 |4,39,2,15,1777244521,"~/1/columnk_plus_columnk_cpu.f90"
 -'  2  15  ~/1/columnk_plus_columnk_cpu.f90
 |4,39,2,15,1777244521,"~/1/columnk_plus_columnk_cpu.f90"
+-'  2  15  ~/1/columnk_plus_columnk_cpu.f90
+|4,39,2,15,1777244521,"~/1/columnk_plus_columnk_cpu.f90"
+-'  2  15  ~/1/columnk_plus_columnk_cpu.f90
+|4,39,2,15,1777244521,"~/1/columnk_plus_columnk_cpu.f90"
+-'  2  15  ~/1/columnk_plus_columnk_cpu.f90
+|4,39,2,15,1777244521,"~/1/columnk_plus_columnk_cpu.f90"
+-'  2  15  ~/1/columnk_plus_columnk_cpu.f90
+|4,39,2,15,1777244521,"~/1/columnk_plus_columnk_cpu.f90"
+-'  2  15  ~/1/columnk_plus_columnk_cpu.f90
+|4,39,2,15,1777244521,"~/1/columnk_plus_columnk_cpu.f90"
+-'  2  15  ~/1/columnk_plus_columnk_cpu.f90
+|4,39,2,15,1777244521,"~/1/columnk_plus_columnk_cpu.f90"
+-'  1  0  ~/1/columnk_plus_columnk_cpu.f90
+|4,39,1,0,1777244506,"~/1/columnk_plus_columnk_cpu.f90"
+-'  1  0  ~/1/columnk_plus_columnk_cpu.f90
+|4,39,1,0,1777244506,"~/1/columnk_plus_columnk_cpu.f90"
+-'  1  0  ~/1/columnk_plus_columnk_cpu.f90
+|4,39,1,0,1777244506,"~/1/columnk_plus_columnk_cpu.f90"
 -'  1  0  ~/1/columnk_plus_columnk_cpu.f90
 |4,39,1,0,1777244506,"~/1/columnk_plus_columnk_cpu.f90"
 -'  8  0  ~/1/11
@@ -226,6 +324,54 @@ $
 |4,39,8,0,1777244329,"~/1/11"
 -'  8  0  ~/1/11
 |4,39,8,0,1777244329,"~/1/11"
+-'  8  0  ~/1/11
+|4,39,8,0,1777244329,"~/1/11"
+-'  8  0  ~/1/11
+|4,39,8,0,1777244329,"~/1/11"
+-'  8  0  ~/1/11
+|4,39,8,0,1777244329,"~/1/11"
+-'  8  0  ~/1/11
+|4,39,8,0,1777244329,"~/1/11"
+-'  8  0  ~/1/11
+|4,39,8,0,1777244329,"~/1/11"
+-'  8  0  ~/1/11
+|4,39,8,0,1777244329,"~/1/11"
+-'  8  0  ~/1/11
+|4,39,8,0,1777244329,"~/1/11"
+-'  8  0  ~/1/11
+|4,39,8,0,1777244329,"~/1/11"
+-'  8  0  ~/1/11
+|4,39,8,0,1777244329,"~/1/11"
+-'  8  0  ~/1/11
+|4,39,8,0,1777244329,"~/1/11"
+-'  8  0  ~/1/11
+|4,39,8,0,1777244329,"~/1/11"
+-'  8  0  ~/1/11
+|4,39,8,0,1777244329,"~/1/11"
+-'  8  0  ~/1/11
+|4,39,8,0,1777244329,"~/1/11"
+-'  8  0  ~/1/11
+|4,39,8,0,1777244329,"~/1/11"
+-'  8  0  ~/1/11
+|4,39,8,0,1777244329,"~/1/11"
+-'  8  0  ~/1/11
+|4,39,8,0,1777244329,"~/1/11"
+-'  8  0  ~/1/11
+|4,39,8,0,1777244329,"~/1/11"
+-'  8  0  ~/1/11
+|4,39,8,0,1777244329,"~/1/11"
+-'  8  0  ~/1/11
+|4,39,8,0,1777244329,"~/1/11"
+-'  8  0  ~/1/11
+|4,39,8,0,1777244329,"~/1/11"
+-'  8  0  ~/1/11
+|4,39,8,0,1777244329,"~/1/11"
+-'  8  0  ~/1/11
+|4,39,8,0,1777244329,"~/1/11"
+-'  8  0  ~/1/11
+|4,39,8,0,1777244329,"~/1/11"
+-'  8  0  ~/1/11
+|4,39,8,0,1777244329,"~/1/11"
 -'  42  38  ~/1/rowl_plus_rowl_cpu.f90
 |4,39,42,38,1777243738,"~/1/rowl_plus_rowl_cpu.f90"
 -'  42  38  ~/1/rowl_plus_rowl_cpu.f90
@@ -258,148 +404,64 @@ $
 |4,39,42,38,1777243738,"~/1/rowl_plus_rowl_cpu.f90"
 -'  42  38  ~/1/rowl_plus_rowl_cpu.f90
 |4,39,42,38,1777243738,"~/1/rowl_plus_rowl_cpu.f90"
--'  42  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,42,0,1777243729,"~/1/rowl_plus_rowl_cpu.f90"
--'  42  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,42,0,1777243729,"~/1/rowl_plus_rowl_cpu.f90"
--'  42  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,42,0,1777243729,"~/1/rowl_plus_rowl_cpu.f90"
--'  42  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,42,0,1777243729,"~/1/rowl_plus_rowl_cpu.f90"
--'  42  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,42,0,1777243729,"~/1/rowl_plus_rowl_cpu.f90"
--'  42  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,42,0,1777243729,"~/1/rowl_plus_rowl_cpu.f90"
--'  42  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,42,0,1777243729,"~/1/rowl_plus_rowl_cpu.f90"
--'  42  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,42,0,1777243729,"~/1/rowl_plus_rowl_cpu.f90"
--'  42  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,42,0,1777243729,"~/1/rowl_plus_rowl_cpu.f90"
--'  42  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,42,0,1777243729,"~/1/rowl_plus_rowl_cpu.f90"
--'  42  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,42,0,1777243729,"~/1/rowl_plus_rowl_cpu.f90"
--'  42  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,42,0,1777243729,"~/1/rowl_plus_rowl_cpu.f90"
--'  42  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,42,0,1777243729,"~/1/rowl_plus_rowl_cpu.f90"
--'  42  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,42,0,1777243729,"~/1/rowl_plus_rowl_cpu.f90"
--'  42  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,42,0,1777243729,"~/1/rowl_plus_rowl_cpu.f90"
--'  42  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,42,0,1777243729,"~/1/rowl_plus_rowl_cpu.f90"
--'  70  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,70,0,1777243708,"~/1/rowl_plus_rowl_cpu.f90"
--'  70  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,70,0,1777243708,"~/1/rowl_plus_rowl_cpu.f90"
--'  70  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,70,0,1777243708,"~/1/rowl_plus_rowl_cpu.f90"
--'  70  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,70,0,1777243708,"~/1/rowl_plus_rowl_cpu.f90"
--'  70  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,70,0,1777243708,"~/1/rowl_plus_rowl_cpu.f90"
--'  70  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,70,0,1777243708,"~/1/rowl_plus_rowl_cpu.f90"
--'  70  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,70,0,1777243708,"~/1/rowl_plus_rowl_cpu.f90"
--'  70  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,70,0,1777243708,"~/1/rowl_plus_rowl_cpu.f90"
--'  70  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,70,0,1777243708,"~/1/rowl_plus_rowl_cpu.f90"
--'  70  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,70,0,1777243708,"~/1/rowl_plus_rowl_cpu.f90"
--'  70  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,70,0,1777243708,"~/1/rowl_plus_rowl_cpu.f90"
--'  70  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,70,0,1777243708,"~/1/rowl_plus_rowl_cpu.f90"
--'  70  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,70,0,1777243708,"~/1/rowl_plus_rowl_cpu.f90"
--'  70  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,70,0,1777243708,"~/1/rowl_plus_rowl_cpu.f90"
--'  70  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,70,0,1777243708,"~/1/rowl_plus_rowl_cpu.f90"
--'  70  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,70,0,1777243708,"~/1/rowl_plus_rowl_cpu.f90"
--'  70  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,70,0,1777243708,"~/1/rowl_plus_rowl_cpu.f90"
--'  70  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,70,0,1777243708,"~/1/rowl_plus_rowl_cpu.f90"
--'  70  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,70,0,1777243708,"~/1/rowl_plus_rowl_cpu.f90"
--'  70  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,70,0,1777243708,"~/1/rowl_plus_rowl_cpu.f90"
--'  70  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,70,0,1777243708,"~/1/rowl_plus_rowl_cpu.f90"
--'  70  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,70,0,1777243708,"~/1/rowl_plus_rowl_cpu.f90"
--'  70  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,70,0,1777243708,"~/1/rowl_plus_rowl_cpu.f90"
--'  70  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,70,0,1777243708,"~/1/rowl_plus_rowl_cpu.f90"
--'  70  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,70,0,1777243708,"~/1/rowl_plus_rowl_cpu.f90"
--'  70  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,70,0,1777243708,"~/1/rowl_plus_rowl_cpu.f90"
--'  70  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,70,0,1777243708,"~/1/rowl_plus_rowl_cpu.f90"
--'  70  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,70,0,1777243708,"~/1/rowl_plus_rowl_cpu.f90"
--'  70  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,70,0,1777243708,"~/1/rowl_plus_rowl_cpu.f90"
--'  70  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,70,0,1777243708,"~/1/rowl_plus_rowl_cpu.f90"
--'  70  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,70,0,1777243708,"~/1/rowl_plus_rowl_cpu.f90"
--'  70  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,70,0,1777243708,"~/1/rowl_plus_rowl_cpu.f90"
--'  71  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,71,0,1777243618,"~/1/rowl_plus_rowl_cpu.f90"
--'  71  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,71,0,1777243618,"~/1/rowl_plus_rowl_cpu.f90"
--'  71  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,71,0,1777243618,"~/1/rowl_plus_rowl_cpu.f90"
--'  71  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,71,0,1777243618,"~/1/rowl_plus_rowl_cpu.f90"
--'  71  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,71,0,1777243618,"~/1/rowl_plus_rowl_cpu.f90"
--'  71  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,71,0,1777243618,"~/1/rowl_plus_rowl_cpu.f90"
--'  71  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,71,0,1777243618,"~/1/rowl_plus_rowl_cpu.f90"
--'  71  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,71,0,1777243618,"~/1/rowl_plus_rowl_cpu.f90"
--'  71  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,71,0,1777243618,"~/1/rowl_plus_rowl_cpu.f90"
--'  71  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,71,0,1777243618,"~/1/rowl_plus_rowl_cpu.f90"
--'  71  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,71,0,1777243618,"~/1/rowl_plus_rowl_cpu.f90"
--'  71  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,71,0,1777243618,"~/1/rowl_plus_rowl_cpu.f90"
--'  71  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,71,0,1777243618,"~/1/rowl_plus_rowl_cpu.f90"
--'  71  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,71,0,1777243618,"~/1/rowl_plus_rowl_cpu.f90"
--'  71  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,71,0,1777243618,"~/1/rowl_plus_rowl_cpu.f90"
--'  71  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,71,0,1777243618,"~/1/rowl_plus_rowl_cpu.f90"
--'  71  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,71,0,1777243618,"~/1/rowl_plus_rowl_cpu.f90"
--'  71  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,71,0,1777243618,"~/1/rowl_plus_rowl_cpu.f90"
--'  71  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,71,0,1777243618,"~/1/rowl_plus_rowl_cpu.f90"
--'  71  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,71,0,1777243618,"~/1/rowl_plus_rowl_cpu.f90"
--'  71  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,71,0,1777243618,"~/1/rowl_plus_rowl_cpu.f90"
--'  71  0  ~/1/rowl_plus_rowl_cpu.f90
-|4,39,71,0,1777243618,"~/1/rowl_plus_rowl_cpu.f90"
+-'  42  38  ~/1/rowl_plus_rowl_cpu.f90
+|4,39,42,38,1777243738,"~/1/rowl_plus_rowl_cpu.f90"
+-'  42  38  ~/1/rowl_plus_rowl_cpu.f90
+|4,39,42,38,1777243738,"~/1/rowl_plus_rowl_cpu.f90"
+-'  42  38  ~/1/rowl_plus_rowl_cpu.f90
+|4,39,42,38,1777243738,"~/1/rowl_plus_rowl_cpu.f90"
+-'  42  38  ~/1/rowl_plus_rowl_cpu.f90
+|4,39,42,38,1777243738,"~/1/rowl_plus_rowl_cpu.f90"
+-'  42  38  ~/1/rowl_plus_rowl_cpu.f90
+|4,39,42,38,1777243738,"~/1/rowl_plus_rowl_cpu.f90"
+-'  42  38  ~/1/rowl_plus_rowl_cpu.f90
+|4,39,42,38,1777243738,"~/1/rowl_plus_rowl_cpu.f90"
+-'  42  38  ~/1/rowl_plus_rowl_cpu.f90
+|4,39,42,38,1777243738,"~/1/rowl_plus_rowl_cpu.f90"
+-'  42  38  ~/1/rowl_plus_rowl_cpu.f90
+|4,39,42,38,1777243738,"~/1/rowl_plus_rowl_cpu.f90"
+-'  42  38  ~/1/rowl_plus_rowl_cpu.f90
+|4,39,42,38,1777243738,"~/1/rowl_plus_rowl_cpu.f90"
+-'  42  38  ~/1/rowl_plus_rowl_cpu.f90
+|4,39,42,38,1777243738,"~/1/rowl_plus_rowl_cpu.f90"
+-'  42  38  ~/1/rowl_plus_rowl_cpu.f90
+|4,39,42,38,1777243738,"~/1/rowl_plus_rowl_cpu.f90"
+-'  42  38  ~/1/rowl_plus_rowl_cpu.f90
+|4,39,42,38,1777243738,"~/1/rowl_plus_rowl_cpu.f90"
+-'  42  38  ~/1/rowl_plus_rowl_cpu.f90
+|4,39,42,38,1777243738,"~/1/rowl_plus_rowl_cpu.f90"
+-'  42  38  ~/1/rowl_plus_rowl_cpu.f90
+|4,39,42,38,1777243738,"~/1/rowl_plus_rowl_cpu.f90"
+-'  42  38  ~/1/rowl_plus_rowl_cpu.f90
+|4,39,42,38,1777243738,"~/1/rowl_plus_rowl_cpu.f90"
+-'  42  38  ~/1/rowl_plus_rowl_cpu.f90
+|4,39,42,38,1777243738,"~/1/rowl_plus_rowl_cpu.f90"
+-'  42  38  ~/1/rowl_plus_rowl_cpu.f90
+|4,39,42,38,1777243738,"~/1/rowl_plus_rowl_cpu.f90"
+-'  42  38  ~/1/rowl_plus_rowl_cpu.f90
+|4,39,42,38,1777243738,"~/1/rowl_plus_rowl_cpu.f90"
+-'  42  38  ~/1/rowl_plus_rowl_cpu.f90
+|4,39,42,38,1777243738,"~/1/rowl_plus_rowl_cpu.f90"
+-'  42  38  ~/1/rowl_plus_rowl_cpu.f90
+|4,39,42,38,1777243738,"~/1/rowl_plus_rowl_cpu.f90"
+-'  42  38  ~/1/rowl_plus_rowl_cpu.f90
+|4,39,42,38,1777243738,"~/1/rowl_plus_rowl_cpu.f90"
+-'  42  38  ~/1/rowl_plus_rowl_cpu.f90
+|4,39,42,38,1777243738,"~/1/rowl_plus_rowl_cpu.f90"
+-'  42  38  ~/1/rowl_plus_rowl_cpu.f90
+|4,39,42,38,1777243738,"~/1/rowl_plus_rowl_cpu.f90"
+-'  42  38  ~/1/rowl_plus_rowl_cpu.f90
+|4,39,42,38,1777243738,"~/1/rowl_plus_rowl_cpu.f90"
 
 # History of marks within files (newest to oldest):
+
+> ~/1/matrixkl_plus_matrixkl_cpu.f90
+	*	1777245212	0
+	"	1	33
+	^	76	38
+	.	76	37
+	+	1	34
+	+	76	37
 
 > ~/1/columnk_plus_columnk_cpu.f90
 	*	1777244660	0
