@@ -1,4 +1,4 @@
-program 1l+1l_cpu
+program rowl_plus_rowl_cpu
     implicit none
 
     integer :: l, i
@@ -39,7 +39,7 @@ program 1l+1l_cpu
     call cpu_time(t2)
 
     ! ===== output файл =====
-    filename = "result.txt"
+    filename = "rowl_plus_rowl_cpu.out"
     open(newunit=unit, file=filename, status="replace", action="write")
 
     write(unit,*) "l =", l
@@ -68,4 +68,4 @@ program 1l+1l_cpu
 
     deallocate(A, B, C)
 
-end program 1l+1l_cpu
+end program rowl_plus_rowl_cpu

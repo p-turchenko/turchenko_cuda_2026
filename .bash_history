@@ -64,3 +64,18 @@ git branch -M main
 git ls-files -s
 ьс
 mc
+mc
+git init
+git branch -M main
+git remote set-url origin https://github.com/p-turchenko/turchenko_cuda_2026.git
+git remote add origin https://github.com/p-turchenko/turchenko_cuda_2026.git
+git add .
+git commit -m "Первый пуш"
+git push -f origin main
+gfortran row-l_plus_row-l_cpu.f90 -O3 -o row-l_plus_row-l_cpu
+gfortran rowl_plus_rowl_cpu.f90 -O3 -o rowl_plus_rowl_cpu
+./rowl_plus_rowl_cpu
+mc
+gfortran rowl_plus_rowl_cpu.f90 -O3 -o rowl_plus_rowl_cpu
+./rowl_plus_rowl_cpu
+git push -f origin main
