@@ -1,18 +1,22 @@
 [input-def]
 0=*
 
+[mc.esc.timeout]
+0=1000000
+
 [inpmc.fm.mkdir]
 0=1
 1=zZz
-
-[mc.esc.timeout]
-0=1000000
+2=rowl_plus_rowl_cpu
+3=11
 
 [input2]
 0=1l+1l_l=10in7
 1=1l+1l_l=10in7.f90
 2=/home2/st085140/1/zZz
-3=/home2/st085140/1/
-4=1l+1l_cpu.f90
-5=row-l_plus_row-l_cpu.f90
-6=rowl_plus_rowl_cpu.f90
+3=1l+1l_cpu.f90
+4=row-l_plus_row-l_cpu.f90
+5=rowl_plus_rowl_cpu.f90
+6=/home2/st085140/1/
+7=rowl_plus_rowl_cpu
+8=columnk_plus_columnk_cpu.f90

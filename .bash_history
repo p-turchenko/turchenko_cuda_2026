@@ -79,3 +79,9 @@ mc
 gfortran rowl_plus_rowl_cpu.f90 -O3 -o rowl_plus_rowl_cpu
 ./rowl_plus_rowl_cpu
 git push -f origin main
+git commit -m "Сверхпервый пуш"
+git add .
+git commit -m "Сверхпервый пуш"
+git push -f origin main
+mc
+mc
