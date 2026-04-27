@@ -1,500 +1,500 @@
-    print *, '========================================================================'
+    call gemm_bad_naive_kernel<<<dim3((M+15)/16,(N_mat+15)/16,1), dim3(16,16,1)>>>(A_d,B_d,C_d,M,N_mat,K)
+    istat = cudaEventRecord(stopEvent, 0)
+    istat = cudaEventSynchronize(stopEvent)
+    istat = cudaEventElapsedTime(time_bad, startEvent, stopEvent)
+    time_bad = time_bad / 1000.0
+    gflops_bad = 2.d0*M*N_mat*K/time_bad/1e9
+    C_bad = C_d
     
-    deallocate(h_A, h_B, h_C_serial, h_C_concurrent)
-    deallocate(d_A, d_B_all, d_C_all)
+    ! good kernel
+    C_d = 0.d0
+    istat = cudaEventRecord(startEvent, 0)
+    call gemm_good_naive_kernel<<<dim3((M+15)/16,(N_mat+15)/16,1), dim3(16,16,1)>>>(A_d,B_d,C_d,M,N_mat,K)
+    istat = cudaEventRecord(stopEvent, 0)
+    istat = cudaEventSynchronize(stopEvent)
+    istat = cudaEventElapsedTime(time_good, startEvent, stopEvent)
+    time_good = time_good / 1000.0
+    gflops_good = 2.d0*M*N_mat*K/time_good/1e9
+    C_good = C_d
     
-end program gemm_streams_main
+    ! tiled kernel
+    C_d = 0.d0
+    istat = cudaEventRecord(startEvent, 0)
+    call gemm_tiled_kernel<<<dim3((M+TILE-1)/TILE,(N_mat+TILE-1)/TILE,1), dim3(TILE,TILE,1)>>>(A_d,B_d,C_d,M,N_mat,K)
+    istat = cudaEventRecord(stopEvent, 0)
+    istat = cudaEventSynchronize(stopEvent)
+    istat = cudaEventElapsedTime(time_tiled, startEvent, stopEvent)
+    time_tiled = time_tiled / 1000.0
+    gflops_tiled = 2.d0*M*N_mat*K/time_tiled/1e9
+    C_tiled = C_d
+    
+    ! cuBLAS - optimized version
+    C_d = 0.d0
+    istat = cudaEventRecord(startEvent, 0)
+    istat = cublasDgemm_v2(handle, CUBLAS_OP_N, CUBLAS_OP_N, &
+                           M, N_mat, K, &
+                           alpha, A_d, M, B_d, K, beta, C_d, M)
+    istat = cudaEventRecord(stopEvent, 0)
+    istat = cudaEventSynchronize(stopEvent)
+    istat = cudaEventElapsedTime(time_cublas, startEvent, stopEvent)
+    time_cublas = time_cublas / 1000.0
+    gflops_cublas = 2.d0*M*N_mat*K/time_cublas/1e9
+    C_cublas = C_d
+    
+    print *, 'CPU:    ', time_cpu, 'sec, ', gflops_cpu, 'GFLOPS'
+    print *, 'bad:    ', time_bad, 'sec, ', gflops_bad, 'GFLOPS'
+    print *, 'good:   ', time_good, 'sec, ', gflops_good, 'GFLOPS'
+    print *, 'tiled:  ', time_tiled, 'sec, ', gflops_tiled, 'GFLOPS'
+    print *, 'cublas: ', time_cublas, 'sec, ', gflops_cublas, 'GFLOPS'
+    
+    ! Check results
+    print *, 'Max error bad vs CPU:   ', maxval(abs(C_bad - C_cpu))
+    print *, 'Max error good vs CPU:  ', maxval(abs(C_good - C_cpu))
+    print *, 'Max error tiled vs CPU: ', maxval(abs(C_tiled - C_cpu))
+    print *, 'Max error cublas vs CPU:', maxval(abs(C_cublas - C_cpu))
+    
+    ! Cleanup
+    istat = cublasDestroy(handle)
+    istat = cudaEventDestroy(startEvent)
+    istat = cudaEventDestroy(stopEvent)
+    
+end program
 EOF
 
-cd ~/5 && cat > gemm_streams.cuf << 'EOF' && nvfortran -cuda -o gemm_streams gemm_streams.cuf -lcublas -lcudart && ./gemm_streams
-program gemm_streams_main
+mc
+./gemm_no_cublas
+cat > gemm_cublas.cuf << 'EOF' && nvfortran -O3 -o gemm_cublas gemm_cublas.cuf -I/opt/nvidia/hpc_sdk/Linux_x86_64/24.5/cuda/include -L/opt/nvidia/hpc_sdk/Linux_x86_64/24.5/cuda/lib64 -Wl,-rpath,/opt/nvidia/hpc_sdk/Linux_x86_64/24.5/cuda/lib64 -cudalib=cublas -lcudart && ./gemm_cublasmodule matrix_kernel_module
     use cudafor
     implicit none
-
+    
+    integer, parameter :: TILE = 16
     integer, parameter :: DP = kind(1.d0)
     
-    ! Размеры матриц (константы)
-    integer, parameter :: M = 512
-    integer, parameter :: N = 512
-    integer, parameter :: K_LARGE = 4096
-    integer, parameter :: NSTREAMS = 4
-    integer, parameter :: SZPART_MAX = (K_LARGE + NSTREAMS - 1) / NSTREAMS
-    
-    integer :: i, j, istat, istream, szpart, shift
-    real(DP), allocatable, target :: h_A(:,:), h_B(:,:)
-    real(DP), allocatable, target :: h_C_serial(:,:), h_C_concurrent(:,:)
-    real(DP), device, allocatable, target :: d_A(:,:)
-    real(DP), device, allocatable, target :: d_B_all(:,:), d_C_all(:,:)
-    real(DP) :: alpha, beta, max_diff
-    real :: start_time, end_time
-    real :: time_serial, time_concurrent
-    real(DP) :: gflops_serial, gflops_concurrent
-    
-    ! CUDA Streams и cuBLAS handles
-    integer(kind=cuda_stream_kind) :: stream(NSTREAMS)
-    integer(kind=c_intptr_t) :: handle(NSTREAMS)
-    
-    ! Внешние функции cuBLAS
-    interface
-        function cublasCreate(handle) bind(C, name='cublasCreate_v2')
-            use iso_c_binding
-            integer(c_int) :: cublasCreate
-            integer(c_intptr_t) :: handle
-        end function cublasCreate
+contains
+
+    attributes(global) subroutine gemm_bad_naive_kernel(a, b, c, m, n, k)
+        real(DP), device :: a(:,:), b(:,:), c(:,:)
+        integer, value :: m, n, k
+        integer :: i, j, p
+        real(DP) :: acc
         
-        function cublasDestroy(handle) bind(C, name='cublasDestroy_v2')
-            use iso_c_binding
-            integer(c_int) :: cublasDestroy
-            integer(c_intptr_t), value :: handle
-        end function cublasDestroy
+        i = (blockIdx%y - 1) * blockDim%y + threadIdx%y
+        j = (blockIdx%x - 1) * blockDim%x + threadIdx%x
         
-        function cublasSetStream(handle, stream) bind(C, name='cublasSetStream_v2')
-            use iso_c_binding
-            integer(c_int) :: cublasSetStream
-            integer(c_intptr_t), value :: handle
-            integer(cuda_stream_kind), value :: stream
-        end function cublasSetStream
+        if (i <= m .and. j <= n) then
+            acc = 0.d0
+            do p = 1, k
+                acc = acc + a(i, p) * b(p, j)
+            end do
+            c(i, j) = acc
+        end if
+    end subroutine
+
+    attributes(global) subroutine gemm_good_naive_kernel(a, b, c, m, n, k)
+        real(DP), device :: a(:,:), b(:,:), c(:,:)
+        integer, value :: m, n, k
+        integer :: i, j, p
+        real(DP) :: acc
         
-        function cublasDgemm(handle, transa, transb, m, n, k, alpha, A, lda, B, ldb, beta, C, ldc) &
-            bind(C, name='cublasDgemm_v2')
-            use iso_c_binding
-            integer(c_int) :: cublasDgemm
-            integer(c_intptr_t), value :: handle
-            integer(c_int), value :: transa, transb
-            integer(c_int), value :: m, n, k
-            real(c_double), value :: alpha
-            type(c_ptr), value :: A
-            integer(c_int), value :: lda
-            type(c_ptr), value :: B
-            integer(c_int), value :: ldb
-            real(c_double), value :: beta
-            type(c_ptr), value :: C
-            integer(c_int), value :: ldc
-        end function cublasDgemm
-    end interface
-    
-    integer(c_int), parameter :: CUBLAS_OP_N = 0
-    
-    print *, '========================================================================'
-    print *, 'CUDA STREAMS: SERIAL vs CONCURRENT GEMM'
-    print *, '========================================================================'
-    print '(a, i0, a, i0, a)', ' A: ', M, ' x ', N
-    print '(a, i0, a, i0, a)', ' B: ', N, ' x ', K_LARGE
-    print '(a, i0, a, i0, a)', ' C: ', M, ' x ', K_LARGE
-    print '(a, i0)',            ' Количество streams: ', NSTREAMS
-    print '(a, i0, a)',         ' Максимальный размер части: ', SZPART_MAX, ' столбцов'
-    print *, ''
-    
-    ! ====================================================================
-    ! Выделение памяти на CPU
-    ! ====================================================================
-    allocate(h_A(M, N), h_B(N, K_LARGE))
-    allocate(h_C_serial(M, K_LARGE), h_C_concurrent(M, K_LARGE))
-    
-    ! ====================================================================
-    ! Выделение памяти на GPU (с константными размерами)
-    ! ====================================================================
-    allocate(d_A(M, N))
-    allocate(d_B_all(N, SZPART_MAX * NSTREAMS))
-    allocate(d_C_all(M, SZPART_MAX * NSTREAMS))
-    
-    ! ====================================================================
-    ! Инициализация случайными числами
-    ! ====================================================================
-    call random_seed()
-    call random_number(h_A)
-    call random_number(h_B)
-    
-    ! ====================================================================
-    ! SERIAL MODEL
-    ! ====================================================================
-    print *, '=== SERIAL MODEL (синхронная обработка) ==='
-    print *, ''
-    
-    d_A = h_A
-    alpha = 1.d0
-    beta  = 0.d0
-    
-    call cpu_time(start_time)
-    
-    do istream = 0, NSTREAMS - 1
-        szpart = K_LARGE / NSTREAMS
-        if (istream == NSTREAMS - 1) szpart = szpart + mod(K_LARGE, NSTREAMS)
-        shift = (K_LARGE / NSTREAMS) * istream
+        i = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+        j = (blockIdx%y - 1) * blockDim%y + threadIdx%y
         
-        print '(a, i0, a, i0, a, i0)', '  Часть ', istream, ': columns ', shift+1, '-', shift+szpart
+        if (i <= m .and. j <= n) then
+            acc = 0.d0
+            do p = 1, k
+                acc = acc + a(i, p) * b(p, j)
+            end do
+            c(i, j) = acc
+        end if
+    end subroutine
+
+    attributes(global) subroutine gemm_tiled_kernel(a, b, c, m, n, k)
+        real(DP), device :: a(:,:), b(:,:), c(:,:)
+        integer, value :: m, n, k
+        real(DP), shared :: as(TILE, TILE), bs(TILE, TILE)
+        integer :: tx, ty, i, j, p, t, kk
+        real(DP) :: acc
         
-        ! Синхронное копирование части B
-        d_B_all(1:N, istream*SZPART_MAX+1 : istream*SZPART_MAX+szpart) = &
-            h_B(1:N, shift+1 : shift+szpart)
+        tx = threadIdx%x
+        ty = threadIdx%y
+        i = (blockIdx%x - 1) * TILE + tx
+        j = (blockIdx%y - 1) * TILE + ty
+        acc = 0.d0
         
-        ! GEMM
-        call cublasDgemm(0_c_intptr_t, CUBLAS_OP_N, CUBLAS_OP_N, &
-                         M, szpart, N, alpha, &
-                         c_loc(d_A), M, &
-                         c_loc(d_B_all(1, istream*SZPART_MAX+1)), N, &
-                         beta, &
-                         c_loc(d_C_all(1, istream*SZPART_MAX+1)), M)
-        
-        istat = cudaDeviceSynchronize()
-        
-        ! Синхронное копирование результата
-        h_C_serial(1:M, shift+1 : shift+szpart) = &
-            d_C_all(1:M, istream*SZPART_MAX+1 : istream*SZPART_MAX+szpart)
-    end do
-    
-    call cpu_time(end_time)
-    time_serial = end_time - start_time
-    gflops_serial = 2.d0 * M * N * K_LARGE / time_serial / 1e9
-    
-    print '(a, f10.3, a)', '  Время: ', time_serial * 1000, ' ms'
-    print '(a, f10.2, a)', '  GFLOPS: ', gflops_serial, ''
-    print *, ''
-    
-    ! ====================================================================
-    ! CONCURRENT MODEL
-    ! ====================================================================
-    print *, '=== CONCURRENT MODEL (асинхронная обработка) ==='
-    print *, ''
-    
-    do istream = 1, NSTREAMS
-        istat = cudaStreamCreate(stream(istream))
-        istat = cublasCreate(handle(istream))
-        istat = cublasSetStream(handle(istream), stream(istream))
-    end do
-    
-    d_A = h_A
-    alpha = 1.d0
-    beta  = 0.d0
-    
-    call cpu_time(start_time)
-    
-    do istream = 0, NSTREAMS - 1
-        szpart = K_LARGE / NSTREAMS
-        if (istream == NSTREAMS - 1) szpart = szpart + mod(K_LARGE, NSTREAMS)
-        shift = (K_LARGE / NSTREAMS) * istream
-        
-        print '(a, i0, a, i0, a, i0)', '  Часть ', istream, ': columns ', shift+1, '-', shift+szpart
-        
-        ! Асинхронное копирование H2D
-        istat = cudaMemcpyAsync(d_B_all(1, istream*SZPART_MAX+1), &
-                                c_loc(h_B(1, shift+1)), &
-                                N * szpart * 8, &
-                                cudaMemcpyHostToDevice, &
-                                stream(istream+1))
-        
-        ! GEMM в том же stream
-        istat = cublasDgemm(handle(istream+1), CUBLAS_OP_N, CUBLAS_OP_N, &
-                            M, szpart, N, alpha, &
-                            c_loc(d_A), M, &
-                            c_loc(d_B_all(1, istream*SZPART_MAX+1)), N, &
-                            beta, &
-                            c_loc(d_C_all(1, istream*SZPART_MAX+1)), M)
-        
-        ! Асинхронное копирование D2H
-        istat = cudaMemcpyAsync(c_loc(h_C_concurrent(1, shift+1)), &
-                                d_C_all(1, istream*SZPART_MAX+1), &
-                                M * szpart * 8, &
-                                cudaMemcpyDeviceToHost, &
-                                stream(istream+1))
-    end do
-    
-    istat = cudaDeviceSynchronize()
-    
-    call cpu_time(end_time)
-    time_concurrent = end_time - start_time
-    gflops_concurrent = 2.d0 * M * N * K_LARGE / time_concurrent / 1e9
-    
-    print '(a, f10.3, a)', '  Время: ', time_concurrent * 1000, ' ms'
-    print '(a, f10.2, a)', '  GFLOPS: ', gflops_concurrent, ''
-    print *, ''
-    
-    do istream = 1, NSTREAMS
-        istat = cublasDestroy(handle(istream))
-        istat = cudaStreamDestroy(stream(istream))
-    end do
-    
-    ! ====================================================================
-    ! Проверка
-    ! ====================================================================
-    print *, '=== ПРОВЕРКА ==='
-    max_diff = 0.d0
-    do i = 1, M
-        do j = 1, K_LARGE
-            if (abs(h_C_serial(i, j) - h_C_concurrent(i, j)) > max_diff) then
-                max_diff = abs(h_C_serial(i, j) - h_C_concurrent(i, j))
+        do t = 1, k, TILE
+            kk = t + ty - 1
+            if (i <= m .and. kk <= k) then
+                as(tx, ty) = a(i, kk)
+            else
+                as(tx, ty) = 0.d0
             end if
+            
+            kk = t + tx - 1
+            if (kk <= k .and. j <= n) then
+                bs(tx, ty) = b(kk, j)
+            else
+                bs(tx, ty) = 0.d0
+            end if
+            
+            call syncthreads()
+            
+            do p = 1, TILE
+                acc = acc + as(tx, p) * bs(p, ty)
+            end do
+            
+            call syncthreads()
+        end do
+        
+        if (i <= m .and. j <= n) then
+            c(i, j) = acc
+        end if
+    end subroutine
+
+end module
+
+program gemm_cublas
+    use cudafor
+    use cublas_v2
+    use matrix_kernel_module
+    implicit none
+    
+    integer, parameter :: N = 1024
+    integer, parameter :: M = N, K = N, N_mat = N
+    integer :: i, j, istat
+    real(DP), allocatable :: A(:,:), B(:,:), C_cpu(:,:)
+    real(DP), allocatable :: C_bad(:,:), C_good(:,:), C_tiled(:,:), C_cublas(:,:)
+    real(DP), device, allocatable :: A_d(:,:), B_d(:,:), C_d(:,:)
+    
+    type(cudaEvent) :: startEvent, stopEvent
+    type(cublasHandle) :: handle
+    real :: time_bad, time_good, time_tiled, time_cpu, time_cublas
+    real(DP) :: gflops_bad, gflops_good, gflops_tiled, gflops_cpu, gflops_cublas
+    real(DP), parameter :: alpha = 1.d0, beta = 0.d0
+    
+    allocate(A(M,K), B(K,N_mat), C_cpu(M,N_mat))
+    allocate(C_bad(M,N_mat), C_good(M,N_mat), C_tiled(M,N_mat), C_cublas(M,N_mat))
+    allocate(A_d(M,K), B_d(K,N_mat), C_d(M,N_mat))
+    
+    call random_number(A)
+    call random_number(B)
+    
+    ! Initialize CUDA events
+    istat = cudaEventCreate(startEvent)
+    istat = cudaEventCreate(stopEvent)
+    
+    ! Initialize cuBLAS handle once
+    istat = cublasCreate(handle)
+    if (istat /= CUBLAS_STATUS_SUCCESS) then
+        write(*,*) 'cublasCreate failed'
+        stop
+    end if
+    
+    ! CPU computation
+    istat = cudaEventRecord(startEvent, 0)
+    do j = 1, N_mat
+        do i = 1, M
+            C_cpu(i,j) = sum(A(i,:) * B(:,j))
         end do
     end do
+    istat = cudaEventRecord(stopEvent, 0)
+    istat = cudaEventSynchronize(stopEvent)
+    istat = cudaEventElapsedTime(time_cpu, startEvent, stopEvent)
+    time_cpu = time_cpu / 1000.0  ! Convert ms to seconds
+    gflops_cpu = 2.d0*M*N_mat*K/time_cpu/1e9
     
-    print '(a, e10.2)', '  Макс. отклонение: ', max_diff
-    if (max_diff < 1e-8) then
-        print *, '  ✓ РЕЗУЛЬТАТЫ СОВПАДАЮТ'
-    else
-        print *, '  ✗ ОШИБКА'
-    end if
-    print *, ''
+    A_d = A
+    B_d = B
     
-    ! ====================================================================
-    ! Итоги
-    ! ====================================================================
-    print *, '========================================================================'
-    print *, 'РЕЗУЛЬТАТЫ'
-    print *, '========================================================================'
-    print '(a, f10.3, a, f12.2, a)', ' SERIAL:     ', time_serial * 1000, ' ms, ', gflops_serial, ' GFLOPS'
-    print '(a, f10.3, a, f12.2, a)', ' CONCURRENT: ', time_concurrent * 1000, ' ms, ', gflops_concurrent, ' GFLOPS'
-    print *, ''
-    print '(a, f5.2, a)', ' УСКОРЕНИЕ: ', time_serial / time_concurrent, 'x'
-    print *, ''
-    print *, '========================================================================'
+    ! bad kernel
+    C_d = 0.d0
+    istat = cudaEventRecord(startEvent, 0)
+    call gemm_bad_naive_kernel<<<dim3((M+15)/16,(N_mat+15)/16,1), dim3(16,16,1)>>>(A_d,B_d,C_d,M,N_mat,K)
+    istat = cudaEventRecord(stopEvent, 0)
+    istat = cudaEventSynchronize(stopEvent)
+    istat = cudaEventElapsedTime(time_bad, startEvent, stopEvent)
+    time_bad = time_bad / 1000.0
+    gflops_bad = 2.d0*M*N_mat*K/time_bad/1e9
+    C_bad = C_d
     
-    deallocate(h_A, h_B, h_C_serial, h_C_concurrent)
-    deallocate(d_A, d_B_all, d_C_all)
+    ! good kernel
+    C_d = 0.d0
+    istat = cudaEventRecord(startEvent, 0)
+    call gemm_good_naive_kernel<<<dim3((M+15)/16,(N_mat+15)/16,1), dim3(16,16,1)>>>(A_d,B_d,C_d,M,N_mat,K)
+    istat = cudaEventRecord(stopEvent, 0)
+    istat = cudaEventSynchronize(stopEvent)
+    istat = cudaEventElapsedTime(time_good, startEvent, stopEvent)
+    time_good = time_good / 1000.0
+    gflops_good = 2.d0*M*N_mat*K/time_good/1e9
+    C_good = C_d
     
-end program gemm_streams_main
+    ! tiled kernel
+    C_d = 0.d0
+    istat = cudaEventRecord(startEvent, 0)
+    call gemm_tiled_kernel<<<dim3((M+TILE-1)/TILE,(N_mat+TILE-1)/TILE,1), dim3(TILE,TILE,1)>>>(A_d,B_d,C_d,M,N_mat,K)
+    istat = cudaEventRecord(stopEvent, 0)
+    istat = cudaEventSynchronize(stopEvent)
+    istat = cudaEventElapsedTime(time_tiled, startEvent, stopEvent)
+    time_tiled = time_tiled / 1000.0
+    gflops_tiled = 2.d0*M*N_mat*K/time_tiled/1e9
+    C_tiled = C_d
+    
+    ! cuBLAS - using pre-created handle
+    C_d = 0.d0
+    istat = cudaEventRecord(startEvent, 0)
+    istat = cublasDgemm_v2(handle, CUBLAS_OP_N, CUBLAS_OP_N, &
+                           M, N_mat, K, &
+                           alpha, A_d, M, B_d, K, beta, C_d, M)
+    istat = cudaEventRecord(stopEvent, 0)
+    istat = cudaEventSynchronize(stopEvent)
+    istat = cudaEventElapsedTime(time_cublas, startEvent, stopEvent)
+    time_cublas = time_cublas / 1000.0
+    gflops_cublas = 2.d0*M*N_mat*K/time_cublas/1e9
+    C_cublas = C_d
+    
+    print *, 'Results for matrix multiplication ', M, 'x', N_mat, 'x', K
+    print *, '--------------------------------------------------'
+    print *, 'CPU:    ', time_cpu, 'sec, ', gflops_cpu, 'GFLOPS'
+    print *, 'bad:    ', time_bad, 'sec, ', gflops_bad, 'GFLOPS'
+    print *, 'good:   ', time_good, 'sec, ', gflops_good, 'GFLOPS'
+    print *, 'tiled:  ', time_tiled, 'sec, ', gflops_tiled, 'GFLOPS'
+    print *, 'cublas: ', time_cublas, 'sec, ', gflops_cublas, 'GFLOPS'
+    
+    ! Cleanup
+    istat = cublasDestroy(handle)
+    istat = cudaEventDestroy(startEvent)
+    istat = cudaEventDestroy(stopEvent)
+    
+    deallocate(A, B, C_cpu)
+    deallocate(C_bad, C_good, C_tiled, C_cublas)
+    deallocate(A_d, B_d, C_d)
+    
+end program gemm_cublas
 EOF
 
-cd ~/5 && cat > gemm_streams.cuf << 'EOF' && nvfortran -cuda -o gemm_streams gemm_streams.cuf -lcublas -lcudart && ./gemm_streams
-program gemm_streams_main
+./gemm_cublas
+mc
+cat > gemm_cublas.cuf << 'EOF' && nvfortran -O3 -o gemm_cublas gemm_cublas.cuf -I/opt/nvidia/hpc_sdk/Linux_x86_64/24.5/cuda/include -L/opt/nvidia/hpc_sdk/Linux_x86_64/24.5/cuda/lib64 -Wl,-rpath,/opt/nvidia/hpc_sdk/Linux_x86_64/24.5/cuda/lib64 -cudalib=cublas -lcudart && ./gemm_cublasmodule matrix_kernel_module
     use cudafor
     implicit none
-
+    
+    integer, parameter :: TILE = 16
     integer, parameter :: DP = kind(1.d0)
     
-    ! Размеры матриц
-    integer, parameter :: M = 512
-    integer, parameter :: N = 512
-    integer, parameter :: K_LARGE = 4096
-    integer, parameter :: NSTREAMS = 4
-    integer, parameter :: SZPART_MAX = (K_LARGE + NSTREAMS - 1) / NSTREAMS
-    
-    integer :: i, j, istat, istream, szpart, shift
-    real(DP), allocatable, target :: h_A(:,:), h_B(:,:)
-    real(DP), allocatable, target :: h_C_serial(:,:), h_C_concurrent(:,:)
-    real(DP), device, allocatable, target :: d_A(:,:)
-    real(DP), device, allocatable, target :: d_B(:,:), d_C(:,:)
-    real(DP) :: alpha, beta, max_diff
-    real :: start_time, end_time
-    real :: time_serial, time_concurrent
-    real(DP) :: gflops_serial, gflops_concurrent
-    
-    ! CUDA Streams и cuBLAS handles
-    integer(kind=cuda_stream_kind) :: stream(NSTREAMS)
-    integer(kind=c_intptr_t) :: handle(NSTREAMS)
-    
-    ! Внешние функции cuBLAS
-    interface
-        function cublasCreate(handle) bind(C, name='cublasCreate_v2')
-            use iso_c_binding
-            integer(c_int) :: cublasCreate
-            integer(c_intptr_t) :: handle
-        end function cublasCreate
+contains
+
+    attributes(global) subroutine gemm_bad_naive_kernel(a, b, c, m, n, k)
+        real(DP), device :: a(:,:), b(:,:), c(:,:)
+        integer, value :: m, n, k
+        integer :: i, j, p
+        real(DP) :: acc
         
-        function cublasDestroy(handle) bind(C, name='cublasDestroy_v2')
-            use iso_c_binding
-            integer(c_int) :: cublasDestroy
-            integer(c_intptr_t), value :: handle
-        end function cublasDestroy
+        i = (blockIdx%y - 1) * blockDim%y + threadIdx%y
+        j = (blockIdx%x - 1) * blockDim%x + threadIdx%x
         
-        function cublasSetStream(handle, stream) bind(C, name='cublasSetStream_v2')
-            use iso_c_binding
-            integer(c_int) :: cublasSetStream
-            integer(c_intptr_t), value :: handle
-            integer(cuda_stream_kind), value :: stream
-        end function cublasSetStream
+        if (i <= m .and. j <= n) then
+            acc = 0.d0
+            do p = 1, k
+                acc = acc + a(i, p) * b(p, j)
+            end do
+            c(i, j) = acc
+        end if
+    end subroutine
+
+    attributes(global) subroutine gemm_good_naive_kernel(a, b, c, m, n, k)
+        real(DP), device :: a(:,:), b(:,:), c(:,:)
+        integer, value :: m, n, k
+        integer :: i, j, p
+        real(DP) :: acc
         
-        function cublasDgemm(handle, transa, transb, m, n, k, alpha, A, lda, B, ldb, beta, C, ldc) &
-            bind(C, name='cublasDgemm_v2')
-            use iso_c_binding
-            integer(c_int) :: cublasDgemm
-            integer(c_intptr_t), value :: handle
-            integer(c_int), value :: transa, transb
-            integer(c_int), value :: m, n, k
-            real(c_double), value :: alpha
-            type(c_ptr), value :: A
-            integer(c_int), value :: lda
-            type(c_ptr), value :: B
-            integer(c_int), value :: ldb
-            real(c_double), value :: beta
-            type(c_ptr), value :: C
-            integer(c_int), value :: ldc
-        end function cublasDgemm
-    end interface
-    
-    integer(c_int), parameter :: CUBLAS_OP_N = 0
-    
-    print *, '========================================================================'
-    print *, 'CUDA STREAMS: SERIAL vs CONCURRENT GEMM'
-    print *, '========================================================================'
-    print '(a, i0, a, i0, a)', ' A: ', M, ' x ', N
-    print '(a, i0, a, i0, a)', ' B: ', N, ' x ', K_LARGE
-    print '(a, i0, a, i0, a)', ' C: ', M, ' x ', K_LARGE
-    print '(a, i0)',            ' Количество streams: ', NSTREAMS
-    print '(a, i0, a)',         ' Максимальный размер части: ', SZPART_MAX, ' столбцов'
-    print *, ''
-    
-    ! ====================================================================
-    ! Выделение памяти на CPU
-    ! ====================================================================
-    allocate(h_A(M, N), h_B(N, K_LARGE))
-    allocate(h_C_serial(M, K_LARGE), h_C_concurrent(M, K_LARGE))
-    
-    ! ====================================================================
-    ! Выделение памяти на GPU (отдельные буферы для каждой части)
-    ! ====================================================================
-    allocate(d_A(M, N))
-    allocate(d_B(N, SZPART_MAX), d_C(M, SZPART_MAX))
-    
-    ! ====================================================================
-    ! Инициализация случайными числами
-    ! ====================================================================
-    call random_seed()
-    call random_number(h_A)
-    call random_number(h_B)
-    
-    ! ====================================================================
-    ! SERIAL MODEL
-    ! ====================================================================
-    print *, '=== SERIAL MODEL (синхронная обработка) ==='
-    print *, ''
-    
-    d_A = h_A
-    alpha = 1.d0
-    beta  = 0.d0
-    
-    call cpu_time(start_time)
-    
-    do istream = 0, NSTREAMS - 1
-        szpart = K_LARGE / NSTREAMS
-        if (istream == NSTREAMS - 1) szpart = szpart + mod(K_LARGE, NSTREAMS)
-        shift = (K_LARGE / NSTREAMS) * istream
+        i = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+        j = (blockIdx%y - 1) * blockDim%y + threadIdx%y
         
-        print '(a, i0, a, i0, a, i0)', '  Часть ', istream, ': columns ', shift+1, '-', shift+szpart
+        if (i <= m .and. j <= n) then
+            acc = 0.d0
+            do p = 1, k
+                acc = acc + a(i, p) * b(p, j)
+            end do
+            c(i, j) = acc
+        end if
+    end subroutine
+
+    attributes(global) subroutine gemm_tiled_kernel(a, b, c, m, n, k)
+        real(DP), device :: a(:,:), b(:,:), c(:,:)
+        integer, value :: m, n, k
+        real(DP), shared :: as(TILE, TILE), bs(TILE, TILE)
+        integer :: tx, ty, i, j, p, t, kk
+        real(DP) :: acc
         
-        ! Синхронное копирование части B
-        d_B(:, 1:szpart) = h_B(:, shift+1 : shift+szpart)
+        tx = threadIdx%x
+        ty = threadIdx%y
+        i = (blockIdx%x - 1) * TILE + tx
+        j = (blockIdx%y - 1) * TILE + ty
+        acc = 0.d0
         
-        ! GEMM
-        call cublasDgemm(0_c_intptr_t, CUBLAS_OP_N, CUBLAS_OP_N, &
-                         M, szpart, N, alpha, &
-                         c_loc(d_A), M, &
-                         c_loc(d_B), N, &
-                         beta, &
-                         c_loc(d_C), M)
+        do t = 1, k, TILE
+            kk = t + ty - 1
+            if (i <= m .and. kk <= k) then
+                as(tx, ty) = a(i, kk)
+            else
+                as(tx, ty) = 0.d0
+            end if
+            
+            kk = t + tx - 1
+            if (kk <= k .and. j <= n) then
+                bs(tx, ty) = b(kk, j)
+            else
+                bs(tx, ty) = 0.d0
+            end if
+            
+            call syncthreads()
+            
+            do p = 1, TILE
+                acc = acc + as(tx, p) * bs(p, ty)
+            end do
+            
+            call syncthreads()
+        end do
         
-        istat = cudaDeviceSynchronize()
-        
-        ! Синхронное копирование результата
-        h_C_serial(:, shift+1 : shift+szpart) = d_C(:, 1:szpart)
-    end do
+        if (i <= m .and. j <= n) then
+            c(i, j) = acc
+        end if
+    end subroutine
+
+end module
+
+program gemm_cublas
+    use cudafor
+    use cublas_v2
+    use matrix_kernel_module
+    implicit none
     
-    call cpu_time(end_time)
-    time_serial = end_time - start_time
-    gflops_serial = 2.d0 * M * N * K_LARGE / time_serial / 1e9
+    integer, parameter :: N = 1024
+    integer, parameter :: M = N, K = N, N_mat = N
+    integer :: i, j, istat
+    real(DP), allocatable :: A(:,:), B(:,:), C_cpu(:,:)
+    real(DP), allocatable :: C_bad(:,:), C_good(:,:), C_tiled(:,:), C_cublas(:,:)
+    real(DP), device, allocatable :: A_d(:,:), B_d(:,:), C_d(:,:)
     
-    print '(a, f10.3, a)', '  Время: ', time_serial * 1000, ' ms'
-    print '(a, f10.2, a)', '  GFLOPS: ', gflops_serial, ''
-    print *, ''
+    type(cudaEvent) :: startEvent, stopEvent
+    type(cublasHandle) :: handle
+    real :: time_bad, time_good, time_tiled, time_cpu, time_cublas
+    real(DP) :: gflops_bad, gflops_good, gflops_tiled, gflops_cpu, gflops_cublas
+    real(DP), parameter :: alpha = 1.d0, beta = 0.d0
     
-    ! ====================================================================
-    ! CONCURRENT MODEL
-    ! ====================================================================
-    print *, '=== CONCURRENT MODEL (асинхронная обработка) ==='
-    print *, ''
+    allocate(A(M,K), B(K,N_mat), C_cpu(M,N_mat))
+    allocate(C_bad(M,N_mat), C_good(M,N_mat), C_tiled(M,N_mat), C_cublas(M,N_mat))
+    allocate(A_d(M,K), B_d(K,N_mat), C_d(M,N_mat))
     
-    do istream = 1, NSTREAMS
-        istat = cudaStreamCreate(stream(istream))
-        istat = cublasCreate(handle(istream))
-        istat = cublasSetStream(handle(istream), stream(istream))
-    end do
+    call random_number(A)
+    call random_number(B)
     
-    d_A = h_A
-    alpha = 1.d0
-    beta  = 0.d0
+    ! Initialize CUDA events
+    istat = cudaEventCreate(startEvent)
+    istat = cudaEventCreate(stopEvent)
     
-    call cpu_time(start_time)
+    ! Initialize cuBLAS handle once
+    istat = cublasCreate(handle)
+    if (istat /= CUBLAS_STATUS_SUCCESS) then
+        write(*,*) 'cublasCreate failed'
+        stop
+    end if
     
-    do istream = 0, NSTREAMS - 1
-        szpart = K_LARGE / NSTREAMS
-        if (istream == NSTREAMS - 1) szpart = szpart + mod(K_LARGE, NSTREAMS)
-        shift = (K_LARGE / NSTREAMS) * istream
-        
-        print '(a, i0, a, i0, a, i0)', '  Часть ', istream, ': columns ', shift+1, '-', shift+szpart
-        
-        ! Асинхронное копирование H2D
-        istat = cudaMemcpyAsync(d_B, c_loc(h_B(1, shift+1)), &
-                                N * szpart * 8, &
-                                cudaMemcpyHostToDevice, &
-                                stream(istream+1))
-        
-        ! GEMM в том же stream
-        istat = cublasDgemm(handle(istream+1), CUBLAS_OP_N, CUBLAS_OP_N, &
-                            M, szpart, N, alpha, &
-                            c_loc(d_A), M, &
-                            c_loc(d_B), N, &
-                            beta, &
-                            c_loc(d_C), M)
-        
-        ! Асинхронное копирование D2H
-        istat = cudaMemcpyAsync(c_loc(h_C_concurrent(1, shift+1)), &
-                                d_C, &
-                                M * szpart * 8, &
-                                cudaMemcpyDeviceToHost, &
-                                stream(istream+1))
-    end do
+    A_d = A
+    B_d = B
+    C_d = 0.d0
     
+    ! Warmup - run cuBLAS once to initialize GPU and avoid first-run overhead
+    istat = cublasDgemm_v2(handle, CUBLAS_OP_N, CUBLAS_OP_N, &
+                           M, N_mat, K, &
+                           alpha, A_d, M, B_d, K, beta, C_d, M)
     istat = cudaDeviceSynchronize()
     
-    call cpu_time(end_time)
-    time_concurrent = end_time - start_time
-    gflops_concurrent = 2.d0 * M * N * K_LARGE / time_concurrent / 1e9
-    
-    print '(a, f10.3, a)', '  Время: ', time_concurrent * 1000, ' ms'
-    print '(a, f10.2, a)', '  GFLOPS: ', gflops_concurrent, ''
-    print *, ''
-    
-    do istream = 1, NSTREAMS
-        istat = cublasDestroy(handle(istream))
-        istat = cudaStreamDestroy(stream(istream))
-    end do
-    
-    ! ====================================================================
-    ! Проверка
-    ! ====================================================================
-    print *, '=== ПРОВЕРКА ==='
-    max_diff = 0.d0
-    do i = 1, M
-        do j = 1, K_LARGE
-            if (abs(h_C_serial(i, j) - h_C_concurrent(i, j)) > max_diff) then
-                max_diff = abs(h_C_serial(i, j) - h_C_concurrent(i, j))
-            end if
+    ! CPU computation
+    istat = cudaEventRecord(startEvent, 0)
+    do j = 1, N_mat
+        do i = 1, M
+            C_cpu(i,j) = sum(A(i,:) * B(:,j))
         end do
     end do
+    istat = cudaEventRecord(stopEvent, 0)
+    istat = cudaEventSynchronize(stopEvent)
+    istat = cudaEventElapsedTime(time_cpu, startEvent, stopEvent)
+    time_cpu = time_cpu / 1000.0  ! Convert ms to seconds
+    gflops_cpu = 2.d0*M*N_mat*K/time_cpu/1e9
     
-    print '(a, e10.2)', '  Макс. отклонение: ', max_diff
-    if (max_diff < 1e-8) then
-        print *, '  ✓ РЕЗУЛЬТАТЫ СОВПАДАЮТ'
-    else
-        print *, '  ✗ ОШИБКА'
-    end if
-    print *, ''
+    ! bad kernel
+    C_d = 0.d0
+    istat = cudaEventRecord(startEvent, 0)
+    call gemm_bad_naive_kernel<<<dim3((M+15)/16,(N_mat+15)/16,1), dim3(16,16,1)>>>(A_d,B_d,C_d,M,N_mat,K)
+    istat = cudaEventRecord(stopEvent, 0)
+    istat = cudaEventSynchronize(stopEvent)
+    istat = cudaEventElapsedTime(time_bad, startEvent, stopEvent)
+    time_bad = time_bad / 1000.0
+    gflops_bad = 2.d0*M*N_mat*K/time_bad/1e9
+    C_bad = C_d
     
-    ! ====================================================================
-    ! Итоги
-    ! ====================================================================
-    print *, '========================================================================'
-    print *, 'РЕЗУЛЬТАТЫ'
-    print *, '========================================================================'
-    print '(a, f10.3, a, f12.2, a)', ' SERIAL:     ', time_serial * 1000, ' ms, ', gflops_serial, ' GFLOPS'
-    print '(a, f10.3, a, f12.2, a)', ' CONCURRENT: ', time_concurrent * 1000, ' ms, ', gflops_concurrent, ' GFLOPS'
-    print *, ''
-    print '(a, f5.2, a)', ' УСКОРЕНИЕ: ', time_serial / time_concurrent, 'x'
-    print *, ''
-    print *, '========================================================================'
+    ! good kernel
+    C_d = 0.d0
+    istat = cudaEventRecord(startEvent, 0)
+    call gemm_good_naive_kernel<<<dim3((M+15)/16,(N_mat+15)/16,1), dim3(16,16,1)>>>(A_d,B_d,C_d,M,N_mat,K)
+    istat = cudaEventRecord(stopEvent, 0)
+    istat = cudaEventSynchronize(stopEvent)
+    istat = cudaEventElapsedTime(time_good, startEvent, stopEvent)
+    time_good = time_good / 1000.0
+    gflops_good = 2.d0*M*N_mat*K/time_good/1e9
+    C_good = C_d
     
-    deallocate(h_A, h_B, h_C_serial, h_C_concurrent)
-    deallocate(d_A, d_B, d_C)
+    ! tiled kernel
+    C_d = 0.d0
+    istat = cudaEventRecord(startEvent, 0)
+    call gemm_tiled_kernel<<<dim3((M+TILE-1)/TILE,(N_mat+TILE-1)/TILE,1), dim3(TILE,TILE,1)>>>(A_d,B_d,C_d,M,N_mat,K)
+    istat = cudaEventRecord(stopEvent, 0)
+    istat = cudaEventSynchronize(stopEvent)
+    istat = cudaEventElapsedTime(time_tiled, startEvent, stopEvent)
+    time_tiled = time_tiled / 1000.0
+    gflops_tiled = 2.d0*M*N_mat*K/time_tiled/1e9
+    C_tiled = C_d
     
-end program gemm_streams_main
+    ! cuBLAS - using pre-created handle
+    C_d = 0.d0
+    istat = cudaEventRecord(startEvent, 0)
+    istat = cublasDgemm_v2(handle, CUBLAS_OP_N, CUBLAS_OP_N, &
+                           M, N_mat, K, &
+                           alpha, A_d, M, B_d, K, beta, C_d, M)
+    istat = cudaEventRecord(stopEvent, 0)
+    istat = cudaEventSynchronize(stopEvent)
+    istat = cudaEventElapsedTime(time_cublas, startEvent, stopEvent)
+    time_cublas = time_cublas / 1000.0
+    gflops_cublas = 2.d0*M*N_mat*K/time_cublas/1e9
+    C_cublas = C_d
+    
+    print *, 'Results for matrix multiplication ', M, 'x', N_mat, 'x', K
+    print *, '--------------------------------------------------'
+    print *, 'CPU:    ', time_cpu, 'sec, ', gflops_cpu, 'GFLOPS'
+    print *, 'bad:    ', time_bad, 'sec, ', gflops_bad, 'GFLOPS'
+    print *, 'good:   ', time_good, 'sec, ', gflops_good, 'GFLOPS'
+    print *, 'tiled:  ', time_tiled, 'sec, ', gflops_tiled, 'GFLOPS'
+    print *, 'cublas: ', time_cublas, 'sec, ', gflops_cublas, 'GFLOPS'
+    
+    ! Cleanup
+    istat = cublasDestroy(handle)
+    istat = cudaEventDestroy(startEvent)
+    istat = cudaEventDestroy(stopEvent)
+    
+    deallocate(A, B, C_cpu)
+    deallocate(C_bad, C_good, C_tiled, C_cublas)
+    deallocate(A_d, B_d, C_d)
+    
+end program gemm_cublas
 EOF
 
+./gemm_no_cublas
+./gemm_cublas
+mc
+mc
+./gemm_cublas
+mc
+./gemm_cublas
+nvprof ./gemm_cublas
+./concurrent_gemm.exe
+mc

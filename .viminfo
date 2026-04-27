@@ -10,16 +10,21 @@
 
 # hlsearch on (H) or off (h):
 ~h
+# Last Search Pattern:
+~MSle0~/\<write\>
+
 # Last Substitute String:
 $
 
 # Command Line History (newest to oldest):
 :wq
-|2,0,1777258101,,"wq"
+|2,0,1777282766,,"wq"
+:q
+|2,0,1777282378,,"q"
+:WQ
+|2,0,1777279396,,"WQ"
 :wq!
 |2,0,1777257187,,"wq!"
-:q
-|2,0,1777255350,,"q"
 :q!
 |2,0,1777251951,,"q!"
 :'<,'>q
@@ -28,6 +33,8 @@ $
 |2,0,1777240290,,"w"
 
 # Search String History (newest to oldest):
+? \<write\>
+|2,1,1777279513,,"\\<write\\>"
 
 # Expression History (newest to oldest):
 
@@ -36,10 +43,119 @@ $
 # Debug Line History (newest to oldest):
 
 # Registers:
-"0	LINE	0
+""0	LINE	0
+	program concurrent_matrix_multiplication
+	  use cudafor
+	  use cublas_v2
+	  use iso_c_binding, only: c_ptr, c_f_pointer
+	  implicit none
 	
-|3,0,0,1,1,0,1777244327,""
-""1	LINE	0
+	  integer, parameter :: MAX_STREAMS = 16
+	  integer, parameter :: MIN_N_FOR_CONCURRENT = 256
+	
+	  integer :: M, K, N
+	  integer :: nstreams_user, nstreams
+	  integer :: i, s, istat
+	  integer :: lda, ldb, ldc
+	  integer :: base_cols, extra_cols, szpart, startcol
+	
+	  integer(kind=8) :: bytesA, bytesB, bytesC
+	
+	  real(8), pointer :: A_h(:,:), B_h(:,:), C_h(:,:), C_baseline_h(:,:)
+	  real(8), allocatable :: C_ref(:,:)
+	  real(8), allocatable, device :: d_A(:,:), d_B(:,:), d_C(:,:)
+	
+	  type(c_ptr) :: pA, pB, pC, pC_baseline
+	  type(cublasHandle), allocatable :: handle(:)
+	  integer, allocatable :: stream(:)
+	
+	  type(cudaEvent) :: startEvent, stopEvent
+	  type(cudaEvent) :: startEventBaseline, stopEventBaseline
+	  real :: time_ms, time_ms_baseline
+	  real(8) :: time_sec, time_sec_baseline, gflops, gflops_baseline
+	  real(8) :: max_error, max_error_baseline
+	
+	  character(len=256) :: fileA, fileB, fileC
+	
+	  write(*,*) '=== Concurrent Matrix Multiplication (CUDA Streams + cuBLAS) ==='
+	  write(*,*) 'Введите размеры матриц M K N и желаемое число потоков (streams):'
+	  read(*,*) M, K, N, nstreams_user
+	
+	  if (M <= 0 .or. K <= 0 .or. N <= 0) stop 'ERROR: все размеры матриц должны быть > 0'
+	
+	  if (N < MIN_N_FOR_CONCURRENT) then
+	    nstreams = 1
+	    write(*,*) 'Матрица по числу столбцов слишком мала -> используем 1 stream'
+	  else
+	    nstreams = min(nstreams_user, MAX_STREAMS, N)
+	    if (nstreams_user > MAX_STREAMS) then
+	      write(*,*) 'Ограничено MAX_STREAMS =', MAX_STREAMS
+	    end if
+	  end if
+	
+	  lda = M
+|3,1,0,1,50,0,1777282376,"program concurrent_matrix_multiplication","  use cudafor","  use cublas_v2","  use iso_c_binding, only: c_ptr, c_f_pointer","  implicit none","","  integer, parameter :: MAX_STREAMS = 16","  integer, parameter :: MIN_N_FOR_CONCURRENT = 256","","  integer :: M, K, N","  integer :: nstreams_user, nstreams","  integer :: i, s, istat","  integer :: lda, ldb, ldc","  integer :: base_cols, extra_cols, szpart, startcol","",>45
+|<"  integer(kind=8) :: bytesA, bytesB, bytesC","","  real(8), pointer :: A_h(:,:), B_h(:,:), C_h(:,:), C_baseline_h(:,:)","  real(8), allocatable :: C_ref(:,:)","  real(8), allocatable, device :: d_A(:,:), d_B(:,:), d_C(:,:)","","  type(c_ptr) :: pA, pB, pC, pC_baseline","  type(cublasHandle), allocatable :: handle(:)","  integer, allocatable :: stream(:)","","  type(cudaEvent) :: startEvent, stopEvent","  type(cudaEvent) :: startEventBaseline, stopEventBaseline",>37
+|<"  real :: time_ms, time_ms_baseline","  real(8) :: time_sec, time_sec_baseline, gflops, gflops_baseline","  real(8) :: max_error, max_error_baseline","","  character(len=256) :: fileA, fileB, fileC","","  write(*,*) '=== Concurrent Matrix Multiplication (CUDA Streams + cuBLAS) ==='","  write(*,*) 'Введите размеры матриц M K N и желаемое число потоков (streams):'","  read(*,*) M, K, N, nstreams_user","",>114
+|<"  if (M <= 0 .or. K <= 0 .or. N <= 0) stop 'ERROR: все размеры матриц должны быть > 0'","","  if (N < MIN_N_FOR_CONCURRENT) then","    nstreams = 1","    write(*,*) 'Матрица по числу столбцов слишком мала -> используем 1 stream'","  else","    nstreams = min(nstreams_user, MAX_STREAMS, N)","    if (nstreams_user > MAX_STREAMS) then","      write(*,*) 'Ограничено MAX_STREAMS =', MAX_STREAMS","    end if",>10
+|<"  end if","","  lda = M"
+"1	LINE	0
+	program concurrent_matrix_multiplication
+	  use cudafor
+	  use cublas_v2
+	  use iso_c_binding, only: c_ptr, c_f_pointer
+	  implicit none
+	
+	  integer, parameter :: MAX_STREAMS = 16
+	  integer, parameter :: MIN_N_FOR_CONCURRENT = 256
+	
+	  integer :: M, K, N
+	  integer :: nstreams_user, nstreams
+	  integer :: i, s, istat
+	  integer :: lda, ldb, ldc
+	  integer :: base_cols, extra_cols, szpart, startcol
+	
+	  integer(kind=8) :: bytesA, bytesB, bytesC
+	
+	  real(8), pointer :: A_h(:,:), B_h(:,:), C_h(:,:), C_baseline_h(:,:)
+	  real(8), allocatable :: C_ref(:,:)
+	  real(8), allocatable, device :: d_A(:,:), d_B(:,:), d_C(:,:)
+	
+	  type(c_ptr) :: pA, pB, pC, pC_baseline
+	  type(cublasHandle), allocatable :: handle(:)
+	  integer, allocatable :: stream(:)
+	
+	  type(cudaEvent) :: startEvent, stopEvent
+	  type(cudaEvent) :: startEventBaseline, stopEventBaseline
+	  real :: time_ms, time_ms_baseline
+	  real(8) :: time_sec, time_sec_baseline, gflops, gflops_baseline
+	  real(8) :: max_error, max_error_baseline
+	
+	  character(len=256) :: fileA, fileB, fileC
+	
+	  write(*,*) '=== Concurrent Matrix Multiplication (CUDA Streams + cuBLAS) ==='
+	  write(*,*) 'Введите размеры матриц M K N и желаемое число потоков (streams):'
+	  read(*,*) M, K, N, nstreams_user
+	
+	  if (M <= 0 .or. K <= 0 .or. N <= 0) stop 'ERROR: все размеры матриц должны быть > 0'
+	
+	  if (N < MIN_N_FOR_CONCURRENT) then
+	    nstreams = 1
+	    write(*,*) 'Матрица по числу столбцов слишком мала -> используем 1 stream'
+	  else
+	    nstreams = min(nstreams_user, MAX_STREAMS, N)
+	    if (nstreams_user > MAX_STREAMS) then
+	      write(*,*) 'Ограничено MAX_STREAMS =', MAX_STREAMS
+	    end if
+	  end if
+	
+	  lda = M
+|3,0,1,1,50,0,1777279006,"program concurrent_matrix_multiplication","  use cudafor","  use cublas_v2","  use iso_c_binding, only: c_ptr, c_f_pointer","  implicit none","","  integer, parameter :: MAX_STREAMS = 16","  integer, parameter :: MIN_N_FOR_CONCURRENT = 256","","  integer :: M, K, N","  integer :: nstreams_user, nstreams","  integer :: i, s, istat","  integer :: lda, ldb, ldc","  integer :: base_cols, extra_cols, szpart, startcol","",>45
+|<"  integer(kind=8) :: bytesA, bytesB, bytesC","","  real(8), pointer :: A_h(:,:), B_h(:,:), C_h(:,:), C_baseline_h(:,:)","  real(8), allocatable :: C_ref(:,:)","  real(8), allocatable, device :: d_A(:,:), d_B(:,:), d_C(:,:)","","  type(c_ptr) :: pA, pB, pC, pC_baseline","  type(cublasHandle), allocatable :: handle(:)","  integer, allocatable :: stream(:)","","  type(cudaEvent) :: startEvent, stopEvent","  type(cudaEvent) :: startEventBaseline, stopEventBaseline",>37
+|<"  real :: time_ms, time_ms_baseline","  real(8) :: time_sec, time_sec_baseline, gflops, gflops_baseline","  real(8) :: max_error, max_error_baseline","","  character(len=256) :: fileA, fileB, fileC","","  write(*,*) '=== Concurrent Matrix Multiplication (CUDA Streams + cuBLAS) ==='","  write(*,*) 'Введите размеры матриц M K N и желаемое число потоков (streams):'","  read(*,*) M, K, N, nstreams_user","",>114
+|<"  if (M <= 0 .or. K <= 0 .or. N <= 0) stop 'ERROR: все размеры матриц должны быть > 0'","","  if (N < MIN_N_FOR_CONCURRENT) then","    nstreams = 1","    write(*,*) 'Матрица по числу столбцов слишком мала -> используем 1 stream'","  else","    nstreams = min(nstreams_user, MAX_STREAMS, N)","    if (nstreams_user > MAX_STREAMS) then","      write(*,*) 'Ограничено MAX_STREAMS =', MAX_STREAMS","    end if",>10
+|<"  end if","","  lda = M"
+"2	LINE	0
 	module matrix_kernel_module
 	    use cudafor
 	    implicit none
@@ -62,9 +178,9 @@ $
 	    end subroutine add_matrix_kernel
 	
 	end module matrix_kernel_module
-|3,1,1,1,22,0,1777258080,"module matrix_kernel_module","    use cudafor","    implicit none","    ","contains","","    attributes(global) subroutine add_matrix_kernel(a, b, c, n, m)","        real, device :: a(:,:), b(:,:), c(:,:)","        integer, value :: n, m","        ","        integer :: i, j","        ","        i = (blockIdx%y - 1) * blockDim%y + threadIdx%y","        j = (blockIdx%x - 1) * blockDim%x + threadIdx%x","        ",>39
+|3,0,2,1,22,0,1777258080,"module matrix_kernel_module","    use cudafor","    implicit none","    ","contains","","    attributes(global) subroutine add_matrix_kernel(a, b, c, n, m)","        real, device :: a(:,:), b(:,:), c(:,:)","        integer, value :: n, m","        ","        integer :: i, j","        ","        i = (blockIdx%y - 1) * blockDim%y + threadIdx%y","        j = (blockIdx%x - 1) * blockDim%x + threadIdx%x","        ",>39
 |<"        if (i <= n .and. j <= m) then","            c(i, j) = a(i, j) + b(i, j)","        end if","        ","    end subroutine add_matrix_kernel","","end module matrix_kernel_module"
-"2	LINE	0
+"3	LINE	0
 	! ================================================================
 	! ЗАДАНИЕ 1: СЛОЖЕНИЕ МАТРИЦ ПРОИЗВОЛЬНОГО РАЗМЕРА (CPU + GPU)
 	! ================================================================
@@ -115,64 +231,10 @@ $
 	    read *, m
 	    
 	    print *, ''
-|3,0,2,1,50,0,1777257328,"! ================================================================","! ЗАДАНИЕ 1: СЛОЖЕНИЕ МАТРИЦ ПРОИЗВОЛЬНОГО РАЗМЕРА (CPU + GPU)","! ================================================================","","module matrix_kernel_module","    use cudafor","    implicit none","    ","contains","","    attributes(global) subroutine add_matrix_kernel(a, b, c, n, m)",>45
+|3,0,3,1,50,0,1777257328,"! ================================================================","! ЗАДАНИЕ 1: СЛОЖЕНИЕ МАТРИЦ ПРОИЗВОЛЬНОГО РАЗМЕРА (CPU + GPU)","! ================================================================","","module matrix_kernel_module","    use cudafor","    implicit none","    ","contains","","    attributes(global) subroutine add_matrix_kernel(a, b, c, n, m)",>45
 |<"        real, device, intent(in)  :: a(:,:)","        real, device, intent(in)  :: b(:,:)","        real, device, intent(out) :: c(:,:)","        integer, value, intent(in) :: n, m","        ","        integer :: i, j","        ","        i = (blockIdx%y - 1) * blockDim%y + threadIdx%y","        j = (blockIdx%x - 1) * blockDim%x + threadIdx%x","        ","        if (i <= n .and. j <= m) then","            c(i, j) = a(i, j) + b(i, j)","        end if","        ",>38
 |<"    end subroutine add_matrix_kernel","","end module matrix_kernel_module","","program matrix_add_interactive","    use cudafor","    use matrix_kernel_module","    implicit none","    ","    integer :: n, m, i, j, istat","    real, allocatable :: A(:,:), B(:,:), C_cpu(:,:), C_gpu(:,:)","    real, device, allocatable :: A_d(:,:), B_d(:,:), C_d(:,:)","    real :: max_diff","    ","    print *, '============================================='",>62
 |<"    print *, 'СЛОЖЕНИЕ МАТРИЦ НА CPU И GPU'","    print *, '============================================='","    print *, ''","    ","    print *, 'Введите количество СТРОК матрицы:'","    read *, n","    print *, 'Введите количество СТОЛБЦОВ матрицы:'","    read *, m","    ","    print *, ''"
-"3	LINE	0
-	! vec_add.f90
-	! Компиляция: nvfortran vec_add.f90 -o vec_add
-	
-	module vec_add_mod
-	  implicit none
-	  
-	  integer, parameter :: N = 1000000  ! размер векторов
-	  
-	contains
-	
-	  ! Ядро GPU
-	  attributes(global) subroutine vec_add_kernel(a, b, c, n)
-	    real,    intent(in)  :: a(*), b(*)
-	    real,    intent(out) :: c(*)
-	    integer, value       :: n
-	    integer              :: idx
-	
-	    idx = (blockIdx%x - 1) * blockDim%x + threadIdx%x
-	    
-	    if (idx <= n) c(idx) = a(idx) + b(idx)
-	  end subroutine vec_add_kernel
-	
-	  ! Хост-обёртка
-	  subroutine vec_add_gpu(a, b, c)
-	    real, intent(in)  :: a(:), b(:)
-	    real, intent(out) :: c(:)
-	    
-	    real, device, allocatable :: d_a(:), d_b(:), d_c(:)
-	    type(dim3) :: grid, block
-	    integer    :: n, tpb
-	
-	    n   = size(a)
-	    tpb = 256
-	
-	    allocate(d_a(n), d_b(n), d_c(n))
-	
-	    d_a = a      ! H2D
-	    d_b = b      ! H2D
-	
-	    block = dim3(tpb, 1, 1)
-	    grid  = dim3((n + tpb - 1) / tpb, 1, 1)
-	    call vec_add_kernel<<<grid, block>>>(d_a, d_b, d_c, n)
-	
-	    c = d_c      ! D2H
-	
-	    deallocate(d_a, d_b, d_c)
-	  end subroutine vec_add_gpu
-	
-	  ! CPU-версия для проверки
-	  subroutine vec_add_cpu(a, b, c)
-|3,0,3,1,50,0,1777257177,"! vec_add.f90","! Компиляция: nvfortran vec_add.f90 -o vec_add","","module vec_add_mod","  implicit none","  ","  integer, parameter :: N = 1000000  ! размер векторов","  ","contains","","  ! Ядро GPU","  attributes(global) subroutine vec_add_kernel(a, b, c, n)","    real,    intent(in)  :: a(*), b(*)","    real,    intent(out) :: c(*)","    integer, value       :: n","    integer              :: idx","",>55
-|<"    idx = (blockIdx%x - 1) * blockDim%x + threadIdx%x","    ","    if (idx <= n) c(idx) = a(idx) + b(idx)","  end subroutine vec_add_kernel","","  ! Хост-обёртка","  subroutine vec_add_gpu(a, b, c)","    real, intent(in)  :: a(:), b(:)","    real, intent(out) :: c(:)","    ","    real, device, allocatable :: d_a(:), d_b(:), d_c(:)","    type(dim3) :: grid, block","    integer    :: n, tpb","","    n   = size(a)","    tpb = 256","","    allocate(d_a(n), d_b(n), d_c(n))","",>24
-|<"    d_a = a      ! H2D","    d_b = b      ! H2D","","    block = dim3(tpb, 1, 1)","    grid  = dim3((n + tpb - 1) / tpb, 1, 1)","    call vec_add_kernel<<<grid, block>>>(d_a, d_b, d_c, n)","","    c = d_c      ! D2H","","    deallocate(d_a, d_b, d_c)","  end subroutine vec_add_gpu","","  ! CPU-версия для проверки","  subroutine vec_add_cpu(a, b, c)"
 "4	LINE	0
 	! vec_add.f90
 	! Компиляция: nvfortran vec_add.f90 -o vec_add
@@ -224,10 +286,64 @@ $
 	
 	  ! CPU-версия для проверки
 	  subroutine vec_add_cpu(a, b, c)
-|3,0,4,1,50,0,1777257081,"! vec_add.f90","! Компиляция: nvfortran vec_add.f90 -o vec_add","","module vec_add_mod","  implicit none","  ","  integer, parameter :: N = 1000000  ! размер векторов","  ","contains","","  ! Ядро GPU","  attributes(global) subroutine vec_add_kernel(a, b, c, n)","    real,    intent(in)  :: a(*), b(*)","    real,    intent(out) :: c(*)","    integer, value       :: n","    integer              :: idx","",>55
+|3,0,4,1,50,0,1777257177,"! vec_add.f90","! Компиляция: nvfortran vec_add.f90 -o vec_add","","module vec_add_mod","  implicit none","  ","  integer, parameter :: N = 1000000  ! размер векторов","  ","contains","","  ! Ядро GPU","  attributes(global) subroutine vec_add_kernel(a, b, c, n)","    real,    intent(in)  :: a(*), b(*)","    real,    intent(out) :: c(*)","    integer, value       :: n","    integer              :: idx","",>55
 |<"    idx = (blockIdx%x - 1) * blockDim%x + threadIdx%x","    ","    if (idx <= n) c(idx) = a(idx) + b(idx)","  end subroutine vec_add_kernel","","  ! Хост-обёртка","  subroutine vec_add_gpu(a, b, c)","    real, intent(in)  :: a(:), b(:)","    real, intent(out) :: c(:)","    ","    real, device, allocatable :: d_a(:), d_b(:), d_c(:)","    type(dim3) :: grid, block","    integer    :: n, tpb","","    n   = size(a)","    tpb = 256","","    allocate(d_a(n), d_b(n), d_c(n))","",>24
 |<"    d_a = a      ! H2D","    d_b = b      ! H2D","","    block = dim3(tpb, 1, 1)","    grid  = dim3((n + tpb - 1) / tpb, 1, 1)","    call vec_add_kernel<<<grid, block>>>(d_a, d_b, d_c, n)","","    c = d_c      ! D2H","","    deallocate(d_a, d_b, d_c)","  end subroutine vec_add_gpu","","  ! CPU-версия для проверки","  subroutine vec_add_cpu(a, b, c)"
 "5	LINE	0
+	! vec_add.f90
+	! Компиляция: nvfortran vec_add.f90 -o vec_add
+	
+	module vec_add_mod
+	  implicit none
+	  
+	  integer, parameter :: N = 1000000  ! размер векторов
+	  
+	contains
+	
+	  ! Ядро GPU
+	  attributes(global) subroutine vec_add_kernel(a, b, c, n)
+	    real,    intent(in)  :: a(*), b(*)
+	    real,    intent(out) :: c(*)
+	    integer, value       :: n
+	    integer              :: idx
+	
+	    idx = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+	    
+	    if (idx <= n) c(idx) = a(idx) + b(idx)
+	  end subroutine vec_add_kernel
+	
+	  ! Хост-обёртка
+	  subroutine vec_add_gpu(a, b, c)
+	    real, intent(in)  :: a(:), b(:)
+	    real, intent(out) :: c(:)
+	    
+	    real, device, allocatable :: d_a(:), d_b(:), d_c(:)
+	    type(dim3) :: grid, block
+	    integer    :: n, tpb
+	
+	    n   = size(a)
+	    tpb = 256
+	
+	    allocate(d_a(n), d_b(n), d_c(n))
+	
+	    d_a = a      ! H2D
+	    d_b = b      ! H2D
+	
+	    block = dim3(tpb, 1, 1)
+	    grid  = dim3((n + tpb - 1) / tpb, 1, 1)
+	    call vec_add_kernel<<<grid, block>>>(d_a, d_b, d_c, n)
+	
+	    c = d_c      ! D2H
+	
+	    deallocate(d_a, d_b, d_c)
+	  end subroutine vec_add_gpu
+	
+	  ! CPU-версия для проверки
+	  subroutine vec_add_cpu(a, b, c)
+|3,0,5,1,50,0,1777257081,"! vec_add.f90","! Компиляция: nvfortran vec_add.f90 -o vec_add","","module vec_add_mod","  implicit none","  ","  integer, parameter :: N = 1000000  ! размер векторов","  ","contains","","  ! Ядро GPU","  attributes(global) subroutine vec_add_kernel(a, b, c, n)","    real,    intent(in)  :: a(*), b(*)","    real,    intent(out) :: c(*)","    integer, value       :: n","    integer              :: idx","",>55
+|<"    idx = (blockIdx%x - 1) * blockDim%x + threadIdx%x","    ","    if (idx <= n) c(idx) = a(idx) + b(idx)","  end subroutine vec_add_kernel","","  ! Хост-обёртка","  subroutine vec_add_gpu(a, b, c)","    real, intent(in)  :: a(:), b(:)","    real, intent(out) :: c(:)","    ","    real, device, allocatable :: d_a(:), d_b(:), d_c(:)","    type(dim3) :: grid, block","    integer    :: n, tpb","","    n   = size(a)","    tpb = 256","","    allocate(d_a(n), d_b(n), d_c(n))","",>24
+|<"    d_a = a      ! H2D","    d_b = b      ! H2D","","    block = dim3(tpb, 1, 1)","    grid  = dim3((n + tpb - 1) / tpb, 1, 1)","    call vec_add_kernel<<<grid, block>>>(d_a, d_b, d_c, n)","","    c = d_c      ! D2H","","    deallocate(d_a, d_b, d_c)","  end subroutine vec_add_gpu","","  ! CPU-версия для проверки","  subroutine vec_add_cpu(a, b, c)"
+"6	LINE	0
 	! utils_module.f90
 	module utils_module
 	    implicit none
@@ -278,11 +394,11 @@ $
 	! vec_add_module.cuf
 	module vec_add_gpu_module
 	    implicit none
-|3,0,5,1,50,0,1777256059,"! utils_module.f90","module utils_module","    implicit none","contains","    ! Заполнение вектора случайными числами","    subroutine rnd_fill(a)","        real, intent(out) :: a(:)","        call random_number(a)","    end subroutine rnd_fill","","    ! Проверка равенства двух векторов","    function check_equal_vec(a, b, tol) result(is_equal)",>40
+|3,0,6,1,50,0,1777256059,"! utils_module.f90","module utils_module","    implicit none","contains","    ! Заполнение вектора случайными числами","    subroutine rnd_fill(a)","        real, intent(out) :: a(:)","        call random_number(a)","    end subroutine rnd_fill","","    ! Проверка равенства двух векторов","    function check_equal_vec(a, b, tol) result(is_equal)",>40
 |<"        real, intent(in) :: a(:), b(:)","        real, intent(in), optional :: tol","        real :: tolerance","        logical :: is_equal","        integer :: i","        ","        tolerance = 1.0e-5","        if (present(tol)) tolerance = tol","        ","        is_equal = .true.","        if (size(a) /= size(b)) then","            is_equal = .false.","            return","        endif","        ","        do i = 1, size(a)","            if (abs(a(i) - b(i)) > tolerance) then",>36
 |<"                is_equal = .false.","                return","            endif","        enddo","    end function check_equal_vec","end module utils_module","","! vec_add_cpu.f90","module vec_add_cpu_module","    implicit none","contains","    subroutine vec_add_cpu(a, b, c)","        real, intent(in) :: a(:), b(:)","        real, intent(out) :: c(:)","        c = a + b","    end subroutine vec_add_cpu","end module vec_add_cpu_module","","! vec_add_module.cuf",>27
 |<"module vec_add_gpu_module","    implicit none"
-"6	LINE	0
+"7	LINE	0
 	    if (l <= 20) then
 	        print *, "Result vector C = A + B:"
 	        do i = 1, l
@@ -328,11 +444,11 @@ $
 	    deallocate(a, b, c_cpu, c_gpu)
 	    
 	end program main
-|3,0,6,1,45,0,1777255389,"    if (l <= 20) then","        print *, \"Result vector C = A + B:\"","        do i = 1, l","            write(*, '(F10.4)', advance='no') c_gpu(i)","        end do","        print *, \"\"","    else","        print *, \"C(1:10) =\", c_gpu(1:10)","    endif","    print *, \"GPU time:\", gpu_time, \"seconds\"","    ","    ! Вычисление GFLOPS для GPU","    if (gpu_time > 0.0) then",>47
+|3,0,7,1,45,0,1777255389,"    if (l <= 20) then","        print *, \"Result vector C = A + B:\"","        do i = 1, l","            write(*, '(F10.4)', advance='no') c_gpu(i)","        end do","        print *, \"\"","    else","        print *, \"C(1:10) =\", c_gpu(1:10)","    endif","    print *, \"GPU time:\", gpu_time, \"seconds\"","    ","    ! Вычисление GFLOPS для GPU","    if (gpu_time > 0.0) then",>47
 |<"        gflops = real(l) / (gpu_time * 1.0e9)","        print *, \"GPU Performance:\", gflops, \"GFLOPS\"","    endif","    print *, \"\"","    ","    ! Проверка корректности","    print *, \"=== Verification ===\"","    if (check_equal_vec(c_cpu, c_gpu)) then","        print *, \"SUCCESS: CPU and GPU results match!\"","    else","        print *, \"ERROR: CPU and GPU results differ!\"","        if (l <= 20) then","            print *, \"Differences:\"",>25
 |<"            do i = 1, l","                if (abs(c_cpu(i) - c_gpu(i)) > 1.0e-5) then","                    print *, \"Element\", i, \": CPU =\", c_cpu(i), \"GPU =\", c_gpu(i)","                endif","            end do","        endif","    endif","    ","    ! Сравнение производительности","    if (cpu_time > 0.0 .and. gpu_time > 0.0) then","        print *, \"\"","        print *, \"=== Performance Comparison ===\"",>69
 |<"        print *, \"Speedup (CPU/GPU):\", cpu_time / gpu_time, \"x\"","    endif","    ","    ! Очистка","    deallocate(a, b, c_cpu, c_gpu)","    ","end program main"
-"7	LINE	0
+"8	LINE	0
 	! utils_module.f90
 	module utils_module
 	    implicit none
@@ -383,11 +499,11 @@ $
 	! vec_add_module.cuf
 	module vec_add_gpu_module
 	    implicit none
-|3,0,7,1,50,0,1777255387,"! utils_module.f90","module utils_module","    implicit none","contains","    ! Заполнение вектора случайными числами","    subroutine rnd_fill(a)","        real, intent(out) :: a(:)","        call random_number(a)","    end subroutine rnd_fill","","    ! Проверка равенства двух векторов","    function check_equal_vec(a, b, tol) result(is_equal)",>40
+|3,0,8,1,50,0,1777255387,"! utils_module.f90","module utils_module","    implicit none","contains","    ! Заполнение вектора случайными числами","    subroutine rnd_fill(a)","        real, intent(out) :: a(:)","        call random_number(a)","    end subroutine rnd_fill","","    ! Проверка равенства двух векторов","    function check_equal_vec(a, b, tol) result(is_equal)",>40
 |<"        real, intent(in) :: a(:), b(:)","        real, intent(in), optional :: tol","        real :: tolerance","        logical :: is_equal","        integer :: i","        ","        tolerance = 1.0e-5","        if (present(tol)) tolerance = tol","        ","        is_equal = .true.","        if (size(a) /= size(b)) then","            is_equal = .false.","            return","        endif","        ","        do i = 1, size(a)","            if (abs(a(i) - b(i)) > tolerance) then",>36
 |<"                is_equal = .false.","                return","            endif","        enddo","    end function check_equal_vec","end module utils_module","","! vec_add_cpu.f90","module vec_add_cpu_module","    implicit none","contains","    subroutine vec_add_cpu(a, b, c)","        real, intent(in) :: a(:), b(:)","        real, intent(out) :: c(:)","        c = a + b","    end subroutine vec_add_cpu","end module vec_add_cpu_module","","! vec_add_module.cuf",>27
 |<"module vec_add_gpu_module","    implicit none"
-"8	LINE	0
+"9	LINE	0
 	program rowl_plus_rowl_gpu
 	    use cudafor
 	    implicit none
@@ -438,241 +554,280 @@ $
 	    do i = 1, l
 	        write(10,*) C(i)
 	    end do
-|3,0,8,1,50,0,1777254871,"program rowl_plus_rowl_gpu","    use cudafor","    implicit none","","    integer :: l, i","    real, allocatable :: A(:), B(:), C(:)","    real :: t1, t2, elapsed, gflops","","    ! ===== Ввод =====","    print *, \"Enter vector length l:\"","    read *, l","","    ! ===== Выделение памяти =====","    allocate(A(l), B(l), C(l))","","    ! ===== Заполнение случайными числами =====",>24
+|3,0,9,1,50,0,1777254871,"program rowl_plus_rowl_gpu","    use cudafor","    implicit none","","    integer :: l, i","    real, allocatable :: A(:), B(:), C(:)","    real :: t1, t2, elapsed, gflops","","    ! ===== Ввод =====","    print *, \"Enter vector length l:\"","    read *, l","","    ! ===== Выделение памяти =====","    allocate(A(l), B(l), C(l))","","    ! ===== Заполнение случайными числами =====",>24
 |<"    call random_seed()","    call random_number(A)","    call random_number(B)","","    ! ===== Замер времени =====","    call cpu_time(t1)","","    call rowl_plus_rowl_gpu_sub(A, B, C)","","    call cpu_time(t2)","","    elapsed = t2 - t1","","    ! ===== GFLOPS =====","    ! 1 операция сложения на элемент","    gflops = real(l) / (elapsed * 1.0e9)","","    ! ===== Запись в файл =====",>60
 |<"    open(unit=10, file=\"output.txt\", status=\"replace\")","","    write(10,*) \"Vector A:\"","    do i = 1, l","        write(10,*) A(i)","    end do","","    write(10,*) \"Vector B:\"","    do i = 1, l","        write(10,*) B(i)","    end do","","    write(10,*) \"Vector C = A + B:\"","    do i = 1, l","        write(10,*) C(i)","    end do"
-"9	LINE	0
-	end subroutine
-|3,0,9,1,1,0,1777254634,"end subroutine"
 "-	CHAR	0
 	u
 |3,0,36,0,1,0,1777250024,"u"
 
 # File marks:
-'0  1  18  ~/1/matrix_add.f90
-|4,48,1,18,1777258101,"~/1/matrix_add.f90"
-'1  22  30  ~/1/matrix_add.f90
-|4,49,22,30,1777257334,"~/1/matrix_add.f90"
-'2  118  33  ~/1/vec_add.f90
-|4,50,118,33,1777257187,"~/1/vec_add.f90"
-'3  1  0  ~/1/vec_add.f90
-|4,51,1,0,1777257122,"~/1/vec_add.f90"
-'4  1  0  ~/1/vec_add.f90
-|4,52,1,0,1777257122,"~/1/vec_add.f90"
-'5  144  26  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,53,144,26,1777256065,"~/1/rowl_plus_rowl_gpu_2.cuf"
-'6  1  15  ~/1/vec_add.f90
-|4,54,1,15,1777255394,"~/1/vec_add.f90"
-'7  93  15  ~/1/vec_add.f90
-|4,55,93,15,1777255394,"~/1/vec_add.f90"
-'8  1  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,56,1,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
-'9  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,57,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
+'0  1  0  ~/4/gemm_cublas.f90
+|4,48,1,0,1777282766,"~/4/gemm_cublas.f90"
+'1  8  0  ~/4
+|4,49,8,0,1777282378,"~/4"
+'2  35  23  ~/5/concurrent_gemm.cuf
+|4,50,35,23,1777281773,"~/5/concurrent_gemm.cuf"
+'3  35  113  ~/5/concurrent_gemm.cuf
+|4,51,35,113,1777279642,"~/5/concurrent_gemm.cuf"
+'4  227  14  ~/5/concurrent_gemm.cuf
+|4,52,227,14,1777279588,"~/5/concurrent_gemm.cuf"
+'5  227  14  ~/5/concurrent_gemm.cuf
+|4,53,227,14,1777279588,"~/5/concurrent_gemm.cuf"
+'6  227  14  ~/5/concurrent_gemm.cuf
+|4,54,227,14,1777279588,"~/5/concurrent_gemm.cuf"
+'7  227  14  ~/5/concurrent_gemm.cuf
+|4,55,227,14,1777279588,"~/5/concurrent_gemm.cuf"
+'8  230  1  ~/5/concurrent_gemm.cuf
+|4,56,230,1,1777279543,"~/5/concurrent_gemm.cuf"
+'9  230  1  ~/5/concurrent_gemm.cuf
+|4,57,230,1,1777279543,"~/5/concurrent_gemm.cuf"
 
 # Jumplist (newest first):
--'  1  18  ~/1/matrix_add.f90
-|4,39,1,18,1777258101,"~/1/matrix_add.f90"
--'  22  30  ~/1/matrix_add.f90
-|4,39,22,30,1777257334,"~/1/matrix_add.f90"
--'  1  0  ~/1/matrix_add.f90
-|4,39,1,0,1777257324,"~/1/matrix_add.f90"
--'  118  33  ~/1/vec_add.f90
-|4,39,118,33,1777257187,"~/1/vec_add.f90"
--'  118  33  ~/1/vec_add.f90
-|4,39,118,33,1777257187,"~/1/vec_add.f90"
--'  118  33  ~/1/vec_add.f90
-|4,39,118,33,1777257187,"~/1/vec_add.f90"
--'  118  33  ~/1/vec_add.f90
-|4,39,118,33,1777257187,"~/1/vec_add.f90"
--'  1  0  ~/1/vec_add.f90
-|4,39,1,0,1777257170,"~/1/vec_add.f90"
--'  1  0  ~/1/vec_add.f90
-|4,39,1,0,1777257170,"~/1/vec_add.f90"
--'  1  0  ~/1/vec_add.f90
-|4,39,1,0,1777257170,"~/1/vec_add.f90"
--'  1  0  ~/1/vec_add.f90
-|4,39,1,0,1777257170,"~/1/vec_add.f90"
--'  1  0  ~/1/vec_add.f90
-|4,39,1,0,1777257122,"~/1/vec_add.f90"
--'  1  0  ~/1/vec_add.f90
-|4,39,1,0,1777257122,"~/1/vec_add.f90"
--'  1  0  ~/1/vec_add.f90
-|4,39,1,0,1777257122,"~/1/vec_add.f90"
--'  1  0  ~/1/vec_add.f90
-|4,39,1,0,1777257122,"~/1/vec_add.f90"
--'  144  26  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,144,26,1777256065,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  144  26  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,144,26,1777256065,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  144  26  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,144,26,1777256065,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  144  26  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,144,26,1777256065,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  144  26  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,144,26,1777256065,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  144  26  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,144,26,1777256065,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  144  26  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,144,26,1777256065,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  144  26  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,144,26,1777256065,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  144  26  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,144,26,1777256065,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  144  26  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,144,26,1777256065,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  144  26  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,144,26,1777256065,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  144  26  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,144,26,1777256065,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  144  26  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,144,26,1777256065,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  144  26  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,144,26,1777256065,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  144  26  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,144,26,1777256065,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  144  26  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,144,26,1777256065,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  1  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,1,15,1777256055,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  1  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,1,15,1777256055,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  1  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,1,15,1777256055,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  1  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,1,15,1777256055,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  1  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,1,15,1777256055,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  1  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,1,15,1777256055,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  1  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,1,15,1777256055,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  1  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,1,15,1777256055,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  1  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,1,15,1777256055,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  1  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,1,15,1777256055,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  1  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,1,15,1777256055,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  1  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,1,15,1777256055,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  1  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,1,15,1777256055,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  1  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,1,15,1777256055,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  1  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,1,15,1777256055,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  1  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,1,15,1777256055,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  93  15  ~/1/vec_add.f90
-|4,39,93,15,1777255394,"~/1/vec_add.f90"
--'  93  15  ~/1/vec_add.f90
-|4,39,93,15,1777255394,"~/1/vec_add.f90"
--'  93  15  ~/1/vec_add.f90
-|4,39,93,15,1777255394,"~/1/vec_add.f90"
--'  93  15  ~/1/vec_add.f90
-|4,39,93,15,1777255394,"~/1/vec_add.f90"
--'  93  15  ~/1/vec_add.f90
-|4,39,93,15,1777255394,"~/1/vec_add.f90"
--'  93  15  ~/1/vec_add.f90
-|4,39,93,15,1777255394,"~/1/vec_add.f90"
--'  93  15  ~/1/vec_add.f90
-|4,39,93,15,1777255394,"~/1/vec_add.f90"
--'  93  15  ~/1/vec_add.f90
-|4,39,93,15,1777255394,"~/1/vec_add.f90"
--'  1  0  ~/1/vec_add.f90
-|4,39,1,0,1777255384,"~/1/vec_add.f90"
--'  1  0  ~/1/vec_add.f90
-|4,39,1,0,1777255384,"~/1/vec_add.f90"
--'  1  0  ~/1/vec_add.f90
-|4,39,1,0,1777255384,"~/1/vec_add.f90"
--'  1  0  ~/1/vec_add.f90
-|4,39,1,0,1777255384,"~/1/vec_add.f90"
--'  1  0  ~/1/vec_add.f90
-|4,39,1,0,1777255384,"~/1/vec_add.f90"
--'  1  0  ~/1/vec_add.f90
-|4,39,1,0,1777255384,"~/1/vec_add.f90"
--'  1  0  ~/1/vec_add.f90
-|4,39,1,0,1777255384,"~/1/vec_add.f90"
--'  1  0  ~/1/vec_add.f90
-|4,39,1,0,1777255384,"~/1/vec_add.f90"
--'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
--'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
-|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  1  0  ~/4/gemm_cublas.f90
+|4,39,1,0,1777282766,"~/4/gemm_cublas.f90"
+-'  8  0  ~/4
+|4,39,8,0,1777282378,"~/4"
+-'  8  0  ~/4
+|4,39,8,0,1777282378,"~/4"
+-'  35  23  ~/5/concurrent_gemm.cuf
+|4,39,35,23,1777281773,"~/5/concurrent_gemm.cuf"
+-'  35  23  ~/5/concurrent_gemm.cuf
+|4,39,35,23,1777281773,"~/5/concurrent_gemm.cuf"
+-'  35  23  ~/5/concurrent_gemm.cuf
+|4,39,35,23,1777281773,"~/5/concurrent_gemm.cuf"
+-'  35  23  ~/5/concurrent_gemm.cuf
+|4,39,35,23,1777281773,"~/5/concurrent_gemm.cuf"
+-'  35  113  ~/5/concurrent_gemm.cuf
+|4,39,35,113,1777279642,"~/5/concurrent_gemm.cuf"
+-'  35  113  ~/5/concurrent_gemm.cuf
+|4,39,35,113,1777279642,"~/5/concurrent_gemm.cuf"
+-'  35  113  ~/5/concurrent_gemm.cuf
+|4,39,35,113,1777279642,"~/5/concurrent_gemm.cuf"
+-'  35  113  ~/5/concurrent_gemm.cuf
+|4,39,35,113,1777279642,"~/5/concurrent_gemm.cuf"
+-'  227  14  ~/5/concurrent_gemm.cuf
+|4,39,227,14,1777279611,"~/5/concurrent_gemm.cuf"
+-'  227  14  ~/5/concurrent_gemm.cuf
+|4,39,227,14,1777279611,"~/5/concurrent_gemm.cuf"
+-'  227  14  ~/5/concurrent_gemm.cuf
+|4,39,227,14,1777279611,"~/5/concurrent_gemm.cuf"
+-'  227  14  ~/5/concurrent_gemm.cuf
+|4,39,227,14,1777279611,"~/5/concurrent_gemm.cuf"
+-'  227  14  ~/5/concurrent_gemm.cuf
+|4,39,227,14,1777279611,"~/5/concurrent_gemm.cuf"
+-'  227  14  ~/5/concurrent_gemm.cuf
+|4,39,227,14,1777279611,"~/5/concurrent_gemm.cuf"
+-'  227  14  ~/5/concurrent_gemm.cuf
+|4,39,227,14,1777279611,"~/5/concurrent_gemm.cuf"
+-'  227  14  ~/5/concurrent_gemm.cuf
+|4,39,227,14,1777279611,"~/5/concurrent_gemm.cuf"
+-'  227  14  ~/5/concurrent_gemm.cuf
+|4,39,227,14,1777279588,"~/5/concurrent_gemm.cuf"
+-'  227  14  ~/5/concurrent_gemm.cuf
+|4,39,227,14,1777279588,"~/5/concurrent_gemm.cuf"
+-'  227  14  ~/5/concurrent_gemm.cuf
+|4,39,227,14,1777279588,"~/5/concurrent_gemm.cuf"
+-'  227  14  ~/5/concurrent_gemm.cuf
+|4,39,227,14,1777279588,"~/5/concurrent_gemm.cuf"
+-'  230  1  ~/5/concurrent_gemm.cuf
+|4,39,230,1,1777279580,"~/5/concurrent_gemm.cuf"
+-'  230  1  ~/5/concurrent_gemm.cuf
+|4,39,230,1,1777279580,"~/5/concurrent_gemm.cuf"
+-'  230  1  ~/5/concurrent_gemm.cuf
+|4,39,230,1,1777279580,"~/5/concurrent_gemm.cuf"
+-'  230  1  ~/5/concurrent_gemm.cuf
+|4,39,230,1,1777279580,"~/5/concurrent_gemm.cuf"
+-'  230  1  ~/5/concurrent_gemm.cuf
+|4,39,230,1,1777279580,"~/5/concurrent_gemm.cuf"
+-'  230  1  ~/5/concurrent_gemm.cuf
+|4,39,230,1,1777279580,"~/5/concurrent_gemm.cuf"
+-'  230  1  ~/5/concurrent_gemm.cuf
+|4,39,230,1,1777279580,"~/5/concurrent_gemm.cuf"
+-'  230  1  ~/5/concurrent_gemm.cuf
+|4,39,230,1,1777279580,"~/5/concurrent_gemm.cuf"
+-'  230  1  ~/5/concurrent_gemm.cuf
+|4,39,230,1,1777279580,"~/5/concurrent_gemm.cuf"
+-'  230  1  ~/5/concurrent_gemm.cuf
+|4,39,230,1,1777279580,"~/5/concurrent_gemm.cuf"
+-'  230  1  ~/5/concurrent_gemm.cuf
+|4,39,230,1,1777279580,"~/5/concurrent_gemm.cuf"
+-'  230  1  ~/5/concurrent_gemm.cuf
+|4,39,230,1,1777279580,"~/5/concurrent_gemm.cuf"
+-'  230  1  ~/5/concurrent_gemm.cuf
+|4,39,230,1,1777279543,"~/5/concurrent_gemm.cuf"
+-'  230  1  ~/5/concurrent_gemm.cuf
+|4,39,230,1,1777279543,"~/5/concurrent_gemm.cuf"
+-'  230  1  ~/5/concurrent_gemm.cuf
+|4,39,230,1,1777279543,"~/5/concurrent_gemm.cuf"
+-'  230  1  ~/5/concurrent_gemm.cuf
+|4,39,230,1,1777279543,"~/5/concurrent_gemm.cuf"
+-'  230  2  ~/5/concurrent_gemm.cuf
+|4,39,230,2,1777279521,"~/5/concurrent_gemm.cuf"
+-'  230  2  ~/5/concurrent_gemm.cuf
+|4,39,230,2,1777279521,"~/5/concurrent_gemm.cuf"
+-'  230  2  ~/5/concurrent_gemm.cuf
+|4,39,230,2,1777279521,"~/5/concurrent_gemm.cuf"
+-'  230  2  ~/5/concurrent_gemm.cuf
+|4,39,230,2,1777279521,"~/5/concurrent_gemm.cuf"
+-'  227  2  ~/5/concurrent_gemm.cuf
+|4,39,227,2,1777279513,"~/5/concurrent_gemm.cuf"
+-'  227  2  ~/5/concurrent_gemm.cuf
+|4,39,227,2,1777279513,"~/5/concurrent_gemm.cuf"
+-'  227  2  ~/5/concurrent_gemm.cuf
+|4,39,227,2,1777279513,"~/5/concurrent_gemm.cuf"
+-'  227  2  ~/5/concurrent_gemm.cuf
+|4,39,227,2,1777279513,"~/5/concurrent_gemm.cuf"
+-'  227  2  ~/5/concurrent_gemm.cuf
+|4,39,227,2,1777279513,"~/5/concurrent_gemm.cuf"
+-'  227  2  ~/5/concurrent_gemm.cuf
+|4,39,227,2,1777279513,"~/5/concurrent_gemm.cuf"
+-'  227  2  ~/5/concurrent_gemm.cuf
+|4,39,227,2,1777279513,"~/5/concurrent_gemm.cuf"
+-'  227  2  ~/5/concurrent_gemm.cuf
+|4,39,227,2,1777279513,"~/5/concurrent_gemm.cuf"
+-'  219  16  ~/5/concurrent_gemm.cuf
+|4,39,219,16,1777279506,"~/5/concurrent_gemm.cuf"
+-'  219  16  ~/5/concurrent_gemm.cuf
+|4,39,219,16,1777279506,"~/5/concurrent_gemm.cuf"
+-'  219  16  ~/5/concurrent_gemm.cuf
+|4,39,219,16,1777279506,"~/5/concurrent_gemm.cuf"
+-'  219  16  ~/5/concurrent_gemm.cuf
+|4,39,219,16,1777279506,"~/5/concurrent_gemm.cuf"
+-'  219  16  ~/5/concurrent_gemm.cuf
+|4,39,219,16,1777279506,"~/5/concurrent_gemm.cuf"
+-'  219  16  ~/5/concurrent_gemm.cuf
+|4,39,219,16,1777279506,"~/5/concurrent_gemm.cuf"
+-'  219  16  ~/5/concurrent_gemm.cuf
+|4,39,219,16,1777279506,"~/5/concurrent_gemm.cuf"
+-'  219  16  ~/5/concurrent_gemm.cuf
+|4,39,219,16,1777279506,"~/5/concurrent_gemm.cuf"
+-'  219  16  ~/5/concurrent_gemm.cuf
+|4,39,219,16,1777279506,"~/5/concurrent_gemm.cuf"
+-'  219  16  ~/5/concurrent_gemm.cuf
+|4,39,219,16,1777279506,"~/5/concurrent_gemm.cuf"
+-'  219  16  ~/5/concurrent_gemm.cuf
+|4,39,219,16,1777279506,"~/5/concurrent_gemm.cuf"
+-'  219  16  ~/5/concurrent_gemm.cuf
+|4,39,219,16,1777279506,"~/5/concurrent_gemm.cuf"
+-'  219  16  ~/5/concurrent_gemm.cuf
+|4,39,219,16,1777279506,"~/5/concurrent_gemm.cuf"
+-'  219  16  ~/5/concurrent_gemm.cuf
+|4,39,219,16,1777279506,"~/5/concurrent_gemm.cuf"
+-'  219  16  ~/5/concurrent_gemm.cuf
+|4,39,219,16,1777279506,"~/5/concurrent_gemm.cuf"
+-'  219  16  ~/5/concurrent_gemm.cuf
+|4,39,219,16,1777279506,"~/5/concurrent_gemm.cuf"
+-'  219  16  ~/5/concurrent_gemm.cuf
+|4,39,219,16,1777279506,"~/5/concurrent_gemm.cuf"
+-'  219  16  ~/5/concurrent_gemm.cuf
+|4,39,219,16,1777279506,"~/5/concurrent_gemm.cuf"
+-'  219  16  ~/5/concurrent_gemm.cuf
+|4,39,219,16,1777279506,"~/5/concurrent_gemm.cuf"
+-'  219  16  ~/5/concurrent_gemm.cuf
+|4,39,219,16,1777279506,"~/5/concurrent_gemm.cuf"
+-'  219  16  ~/5/concurrent_gemm.cuf
+|4,39,219,16,1777279484,"~/5/concurrent_gemm.cuf"
+-'  219  16  ~/5/concurrent_gemm.cuf
+|4,39,219,16,1777279484,"~/5/concurrent_gemm.cuf"
+-'  219  16  ~/5/concurrent_gemm.cuf
+|4,39,219,16,1777279484,"~/5/concurrent_gemm.cuf"
+-'  219  16  ~/5/concurrent_gemm.cuf
+|4,39,219,16,1777279484,"~/5/concurrent_gemm.cuf"
+-'  230  2  ~/5/concurrent_gemm.cuf
+|4,39,230,2,1777279458,"~/5/concurrent_gemm.cuf"
+-'  230  2  ~/5/concurrent_gemm.cuf
+|4,39,230,2,1777279458,"~/5/concurrent_gemm.cuf"
+-'  230  2  ~/5/concurrent_gemm.cuf
+|4,39,230,2,1777279458,"~/5/concurrent_gemm.cuf"
+-'  230  2  ~/5/concurrent_gemm.cuf
+|4,39,230,2,1777279458,"~/5/concurrent_gemm.cuf"
+-'  230  2  ~/5/concurrent_gemm.cuf
+|4,39,230,2,1777279398,"~/5/concurrent_gemm.cuf"
+-'  230  2  ~/5/concurrent_gemm.cuf
+|4,39,230,2,1777279398,"~/5/concurrent_gemm.cuf"
+-'  230  2  ~/5/concurrent_gemm.cuf
+|4,39,230,2,1777279398,"~/5/concurrent_gemm.cuf"
+-'  230  2  ~/5/concurrent_gemm.cuf
+|4,39,230,2,1777279398,"~/5/concurrent_gemm.cuf"
+-'  221  10  ~/5/concurrent_gemm.cuf
+|4,39,221,10,1777279375,"~/5/concurrent_gemm.cuf"
+-'  221  10  ~/5/concurrent_gemm.cuf
+|4,39,221,10,1777279375,"~/5/concurrent_gemm.cuf"
+-'  221  10  ~/5/concurrent_gemm.cuf
+|4,39,221,10,1777279375,"~/5/concurrent_gemm.cuf"
+-'  221  10  ~/5/concurrent_gemm.cuf
+|4,39,221,10,1777279375,"~/5/concurrent_gemm.cuf"
+-'  221  10  ~/5/concurrent_gemm.cuf
+|4,39,221,10,1777279375,"~/5/concurrent_gemm.cuf"
+-'  221  10  ~/5/concurrent_gemm.cuf
+|4,39,221,10,1777279375,"~/5/concurrent_gemm.cuf"
+-'  221  10  ~/5/concurrent_gemm.cuf
+|4,39,221,10,1777279375,"~/5/concurrent_gemm.cuf"
+-'  221  10  ~/5/concurrent_gemm.cuf
+|4,39,221,10,1777279375,"~/5/concurrent_gemm.cuf"
+-'  221  10  ~/5/concurrent_gemm.cuf
+|4,39,221,10,1777279375,"~/5/concurrent_gemm.cuf"
+-'  221  10  ~/5/concurrent_gemm.cuf
+|4,39,221,10,1777279375,"~/5/concurrent_gemm.cuf"
+-'  221  10  ~/5/concurrent_gemm.cuf
+|4,39,221,10,1777279375,"~/5/concurrent_gemm.cuf"
+-'  221  10  ~/5/concurrent_gemm.cuf
+|4,39,221,10,1777279375,"~/5/concurrent_gemm.cuf"
+-'  221  10  ~/5/concurrent_gemm.cuf
+|4,39,221,10,1777279375,"~/5/concurrent_gemm.cuf"
+-'  221  10  ~/5/concurrent_gemm.cuf
+|4,39,221,10,1777279375,"~/5/concurrent_gemm.cuf"
+-'  221  10  ~/5/concurrent_gemm.cuf
+|4,39,221,10,1777279375,"~/5/concurrent_gemm.cuf"
+-'  221  10  ~/5/concurrent_gemm.cuf
+|4,39,221,10,1777279375,"~/5/concurrent_gemm.cuf"
+-'  221  10  ~/5/concurrent_gemm.cuf
+|4,39,221,10,1777279375,"~/5/concurrent_gemm.cuf"
 
 # History of marks within files (newest to oldest):
+
+> ~/4/gemm_cublas.f90
+	*	1777282765	0
+	"	1	0
+
+> ~/5/concurrent_gemm.cuf
+	*	1777281772	0
+	"	35	23
+	^	35	24
+	.	35	23
+	+	1	129
+	+	248	2
+	+	35	82
+	+	250	14
+	+	219	11
+	+	220	11
+	+	221	11
+	+	219	2
+	+	220	2
+	+	221	2
+	+	223	2
+	+	224	2
+	+	225	2
+	+	227	2
+	+	228	2
+	+	229	2
+	+	230	2
+	+	219	17
+	+	220	17
+	+	221	17
+	+	220	17
+	+	219	17
+	+	227	2
+	+	228	2
+	+	229	2
+	+	230	2
+	+	227	2
+	+	228	2
+	+	229	2
+	+	230	2
+	+	227	14
+	+	35	23
 
 > ~/1/matrix_add.f90
 	*	1777258098	0

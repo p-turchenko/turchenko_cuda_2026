@@ -1,0 +1,65 @@
+program dgemm_device
+  use cublas_v2 ! new cublas 
+  implicit none
+  
+  integer, parameter :: m = 1000, n = 1000, k = 1000
+  real(8), allocatable :: a(:,:), b(:,:), c(:,:)
+  real(8), allocatable, device :: a_d(:,:), b_d(:,:), c_d(:,:)
+  real(8), parameter :: alpha = 1.d0, beta = 0.d0
+  integer :: lda = m, ldb = k, ldc = m
+  integer :: istat
+  
+  type(cublasHandle) :: handle
+  
+  allocate(a(m,k), b(k,n), c(m,n), stat=istat)
+  call check_status_alloc(istat, 'host')
+  
+  allocate(a_d(m,k), b_d(k,n), c_d(m,n), stat=istat)
+  call check_status_alloc(istat, 'device')
+  
+  ! Initialize cublas
+  istat = cublasCreate(handle)
+  call check_status_cublas(istat, 'cublasCreate')
+  
+  a = 1.d0; b = 2.d0; c = 0.d0
+  a_d = a; b_d = b; c_d = c
+  
+  ! C = alpha * A * B + beta * C
+  ! this is function
+  istat = cublasDgemm_v2(handle, CUBLAS_OP_N, CUBLAS_OP_N, m, n, k, &
+                         alpha, a_d, lda, b_d, ldb, beta, c_d, ldc)
+                      
+  call check_status_cublas(istat, 'cublasDgemm')
+
+  c = c_d
+  
+  ! destroy handle
+  istat = cublasDestroy(handle)
+  call check_status_cublas(istat, 'cublasDestroy')
+  
+  write(*,*) 'Max error =', maxval(c - k*2.d0)
+  
+  deallocate(a, b, c)
+  deallocate(a_d, b_d, c_d)
+  
+  contains
+  
+  subroutine check_status_alloc(status, name)
+    integer, intent(in) :: status
+    character(len=*), intent(in) :: name
+    if (status /= 0) then
+        write(*, '(A, A, I0)') "Allocation ERROR: ", name, status
+        stop
+    end if
+  end subroutine check_status_alloc
+
+  subroutine check_status_cublas(status, name)
+    integer, intent(in) :: status
+    character(len=*), intent(in) :: name
+    if (status /= CUBLAS_STATUS_SUCCESS) then
+        write(*, '(A, A, I0)') "ERROR: ", name, status
+        stop
+    end if
+  end subroutine check_status_cublas
+
+end program dgemm_device

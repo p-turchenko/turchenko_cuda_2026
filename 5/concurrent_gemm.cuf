@@ -1,0 +1,273 @@
+program concurrent_matrix_multiplication
+  use cudafor
+  use cublas_v2
+  use iso_c_binding, only: c_ptr, c_f_pointer
+  implicit none
+
+  integer, parameter :: MAX_STREAMS = 16
+  integer, parameter :: MIN_N_FOR_CONCURRENT = 256
+
+  integer :: M, K, N
+  integer :: nstreams_user, nstreams
+  integer :: i, s, istat
+  integer :: lda, ldb, ldc
+  integer :: base_cols, extra_cols, szpart, startcol
+
+  integer(kind=8) :: bytesA, bytesB, bytesC
+
+  real(8), pointer :: A_h(:,:), B_h(:,:), C_h(:,:), C_baseline_h(:,:)
+  real(8), allocatable :: C_ref(:,:)
+  real(8), allocatable, device :: d_A(:,:), d_B(:,:), d_C(:,:)
+
+  type(c_ptr) :: pA, pB, pC, pC_baseline
+  type(cublasHandle), allocatable :: handle(:)
+  integer, allocatable :: stream(:)
+
+  type(cudaEvent) :: startEvent, stopEvent
+  type(cudaEvent) :: startEventBaseline, stopEventBaseline
+  real :: time_ms, time_ms_baseline
+  real(8) :: time_sec, time_sec_baseline, gflops, gflops_baseline
+  real(8) :: max_error, max_error_baseline
+
+  character(len=256) :: fileA, fileB, fileC
+
+  write(*,*) '=== Concurrent Matrix Multiplication (CUDA Streams + cuBLAS) ==='
+  write(*,*) 'k, l, m, n:'
+  read(*,*) M, K, N, nstreams_user
+
+  if (M <= 0 .or. K <= 0 .or. N <= 0) stop 'ERROR: все размеры матриц должны быть > 0'
+
+  if (N < MIN_N_FOR_CONCURRENT) then
+    nstreams = 1
+    write(*,*) 'Матрица по числу столбцов слишком мала -> используем 1 stream'
+  else
+    nstreams = min(nstreams_user, MAX_STREAMS, N)
+    if (nstreams_user > MAX_STREAMS) then
+      write(*,*) 'Ограничено MAX_STREAMS =', MAX_STREAMS
+    end if
+  end if
+
+  lda = M
+  ldb = K
+  ldc = M
+
+  write(*,*) '=== Запуск с M =', M, ' K =', K, ' N =', N, ' streams =', nstreams, ' ==='
+
+  ! ======================= Размеры в байтах для pinned memory =======================
+  bytesA = int(M,8) * int(K,8) * 8_8
+  bytesB = int(K,8) * int(N,8) * 8_8
+  bytesC = int(M,8) * int(N,8) * 8_8
+
+  ! ======================= Pinned host memory =======================
+  istat = cudaHostAlloc(pA, int(bytesA), cudaHostAllocDefault)
+  if (istat /= cudaSuccess) stop 'cudaHostAlloc(A) failed'
+  call c_f_pointer(pA, A_h, [M, K])
+
+  istat = cudaHostAlloc(pB, int(bytesB), cudaHostAllocDefault)
+  if (istat /= cudaSuccess) stop 'cudaHostAlloc(B) failed'
+  call c_f_pointer(pB, B_h, [K, N])
+
+  istat = cudaHostAlloc(pC, int(bytesC), cudaHostAllocDefault)
+  if (istat /= cudaSuccess) stop 'cudaHostAlloc(C) failed'
+  call c_f_pointer(pC, C_h, [M, N])
+
+  istat = cudaHostAlloc(pC_baseline, int(bytesC), cudaHostAllocDefault)
+  if (istat /= cudaSuccess) stop 'cudaHostAlloc(C_baseline) failed'
+  call c_f_pointer(pC_baseline, C_baseline_h, [M, N])
+
+  allocate(C_ref(M,N), stat=istat)
+  if (istat /= 0) stop 'Allocation ERROR: C_ref'
+
+  ! ======================= Device memory =======================
+  allocate(d_A(M,K), d_B(K,N), d_C(M,N), stat=istat)
+  if (istat /= 0) stop 'Allocation ERROR: device arrays'
+
+  ! ======================= Streams and cuBLAS =======================
+  allocate(stream(nstreams), handle(nstreams), stat=istat)
+  if (istat /= 0) stop 'Allocation ERROR: streams/handles'
+
+  call random_seed()
+  call random_number(A_h)
+  call random_number(B_h)
+
+  C_h = 0.0d0
+  C_baseline_h = 0.0d0
+
+  C_ref = matmul(A_h, B_h)
+
+  istat = cudaMemcpy(d_A, A_h, M*K, cudaMemcpyHostToDevice)
+  if (istat /= cudaSuccess) stop 'cudaMemcpy(A -> d_A) failed'
+
+  do i = 1, nstreams
+    istat = cudaStreamCreate(stream(i))
+    if (istat /= cudaSuccess) stop 'cudaStreamCreate failed'
+
+    istat = cublasCreate(handle(i))
+    if (istat /= CUBLAS_STATUS_SUCCESS) stop 'cublasCreate failed'
+
+    istat = cublasSetStream(handle(i), stream(i))
+    if (istat /= CUBLAS_STATUS_SUCCESS) stop 'cublasSetStream failed'
+  end do
+
+  istat = cudaEventCreate(startEventBaseline)
+  istat = cudaEventCreate(stopEventBaseline)
+
+  ! ======================= Baseline DGEMM (single-stream) =======================
+  istat = cudaEventRecord(startEventBaseline, 0)
+
+  istat = cudaMemcpyAsync(d_B, B_h, K*N, cudaMemcpyHostToDevice, stream(1))
+  if (istat /= cudaSuccess) stop 'cudaMemcpyAsync(B) failed (baseline)'
+
+  istat = cublasDgemm_v2(handle(1), CUBLAS_OP_N, CUBLAS_OP_N, &
+                         M, N, K, 1.0d0, d_A, lda, d_B, ldb, 0.0d0, d_C, ldc)
+  if (istat /= CUBLAS_STATUS_SUCCESS) stop 'cublasDgemm_v2 failed (baseline)'
+
+  istat = cudaMemcpyAsync(C_baseline_h, d_C, M*N, cudaMemcpyDeviceToHost, stream(1))
+  if (istat /= cudaSuccess) stop 'cudaMemcpyAsync(C) failed (baseline)'
+
+  istat = cudaDeviceSynchronize()
+  if (istat /= cudaSuccess) stop 'cudaDeviceSynchronize failed (baseline)'
+
+  istat = cudaEventRecord(stopEventBaseline, 0)
+  if (istat /= cudaSuccess) stop 'cudaEventRecord(stop) failed (baseline)'
+
+  istat = cudaEventSynchronize(stopEventBaseline)
+  if (istat /= cudaSuccess) stop 'cudaEventSynchronize failed (baseline)'
+
+  istat = cudaEventElapsedTime(time_ms_baseline, startEventBaseline, stopEventBaseline)
+  if (istat /= cudaSuccess) stop 'cudaEventElapsedTime failed (baseline)'
+
+  max_error_baseline = maxval(abs(C_baseline_h - C_ref))
+  write(*,'(A,ES12.4)') 'Max error (baseline) vs CPU reference = ', max_error_baseline
+
+  time_sec_baseline = time_ms_baseline / 1000.0d0
+  gflops_baseline = 2.0d0 * dble(M) * dble(K) * dble(N) / time_sec_baseline / 1.0d9
+  write(*,'(A,F10.2,A,F10.2)') 'Baseline time = ', time_ms_baseline, ' ms | GFLOPS = ', gflops_baseline
+
+  ! Create events for concurrent timing
+  istat = cudaEventCreate(startEvent)
+  istat = cudaEventCreate(stopEvent)
+
+  istat = cudaEventRecord(startEvent, 0)
+
+  if (nstreams == 1) then
+    ! ======================= Single-stream (concurrent) =======================
+    istat = cudaMemcpyAsync(d_B, B_h, K*N, cudaMemcpyHostToDevice, stream(1))
+    if (istat /= cudaSuccess) stop 'cudaMemcpyAsync(B) failed'
+
+    istat = cublasDgemm_v2(handle(1), CUBLAS_OP_N, CUBLAS_OP_N, &
+                           M, N, K, 1.0d0, d_A, lda, d_B, ldb, 0.0d0, d_C, ldc)
+    if (istat /= CUBLAS_STATUS_SUCCESS) stop 'cublasDgemm_v2 failed'
+
+    istat = cudaMemcpyAsync(C_h, d_C, M*N, cudaMemcpyDeviceToHost, stream(1))
+    if (istat /= cudaSuccess) stop 'cudaMemcpyAsync(C) failed'
+  else
+    ! ======================= Multi-stream mode =======================
+    base_cols  = N / nstreams
+    extra_cols  = mod(N, nstreams)
+
+    do s = 1, nstreams
+      szpart = base_cols
+      if (s <= extra_cols) szpart = szpart + 1
+      if (szpart <= 0) cycle
+
+      startcol = (s - 1) * base_cols + min(s - 1, extra_cols) + 1
+
+      ! 1) H2D: copy block of B
+      ! копируем от первого элемента блока и число элементов K*szpart
+      istat = cudaMemcpyAsync(d_B(1,startcol), &
+                              B_h(1,startcol), &
+                              K*szpart, cudaMemcpyHostToDevice, stream(s))
+      if (istat /= cudaSuccess) stop 'cudaMemcpyAsync(B part) failed'
+
+      ! 2) GEMM: C(:,block) = A * B(:,block)
+      istat = cublasDgemm_v2(handle(s), CUBLAS_OP_N, CUBLAS_OP_N, &
+                             M, szpart, K, 1.0d0, d_A, lda, &
+                             d_B(1,startcol), ldb, 0.0d0, d_C(1,startcol), ldc)
+      if (istat /= CUBLAS_STATUS_SUCCESS) stop 'cublasDgemm_v2 failed'
+
+      ! 3) D2H: copy result block back
+      istat = cudaMemcpyAsync(C_h(1,startcol), &
+                              d_C(1,startcol), &
+                              M*szpart, cudaMemcpyDeviceToHost, stream(s))
+      if (istat /= cudaSuccess) stop 'cudaMemcpyAsync(C part) failed'
+    end do
+  end if
+
+  ! Wait for all streams to finish
+  istat = cudaDeviceSynchronize()
+  if (istat /= cudaSuccess) stop 'cudaDeviceSynchronize failed'
+
+  istat = cudaEventRecord(stopEvent, 0)
+  if (istat /= cudaSuccess) stop 'cudaEventRecord(stop) failed'
+
+  istat = cudaEventSynchronize(stopEvent)
+  if (istat /= cudaSuccess) stop 'cudaEventSynchronize failed'
+
+  istat = cudaEventElapsedTime(time_ms, startEvent, stopEvent)
+  if (istat /= cudaSuccess) stop 'cudaEventElapsedTime failed'
+
+  ! Error and performance for concurrent
+  max_error = maxval(abs(C_h - C_ref))
+  write(*,'(A,ES12.4)') 'Max error vs CPU reference = ', max_error
+
+  time_sec = time_ms / 1000.0d0
+  gflops = 2.0d0 * dble(M) * dble(K) * dble(N) / time_sec / 1.0d9
+  write(*,'(A,F10.2,A,F10.2)') 'Concurrent time = ', time_ms, ' ms | GFLOPS = ', gflops
+
+  ! ======================= Запись матриц в файлы =======================
+  fileA = 'matrix'
+  fileB = 'matrix'
+  fileC = 'matrix'
+
+  call write_matrix_txt(fileA, A_h, M, K)
+  call write_matrix_txt(fileB, B_h, K, N)
+  call write_matrix_txt(fileC, C_h, M, N)
+
+  write(*,*) ' '
+  write(*,*) trim(fileA)
+  write(*,*) trim(fileB)
+  write(*,*) trim(fileC)
+
+  ! ======================= Очистка =======================
+  do i = 1, nstreams
+    istat = cublasDestroy(handle(i))
+    istat = cudaStreamDestroy(stream(i))
+  end do
+
+  istat = cudaEventDestroy(startEvent)
+  istat = cudaEventDestroy(stopEvent)
+  istat = cudaEventDestroy(startEventBaseline)
+  istat = cudaEventDestroy(stopEventBaseline)
+
+  istat = cudaFreeHost(pA)
+  istat = cudaFreeHost(pB)
+  istat = cudaFreeHost(pC)
+  istat = cudaFreeHost(pC_baseline)
+
+  deallocate(C_ref, d_A, d_B, d_C, stream, handle)
+
+  write(*,*) '=== Готово ==='
+
+contains
+
+  subroutine write_matrix_txt(fname, mat, nrow, ncol)
+    character(len=*), intent(in) :: fname
+    real(8), intent(in) :: mat(:,:)
+    integer, intent(in) :: nrow, ncol
+
+    integer :: u, i, j, ios
+
+    open(newunit=u, file=fname, status='replace', action='write', &
+         form='formatted', iostat=ios)
+    if (ios /= 0) stop 'ERROR: cannot open output file'
+
+    write(u,*) nrow, ncol
+    do i = 1, nrow
+      write(u,*) (mat(i,j), j = 1, ncol)
+    end do
+
+    close(u)
+  end subroutine write_matrix_txt
+
+end program concurrent_matrix_multiplication

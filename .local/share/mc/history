@@ -33,6 +33,11 @@
 25=/home2/st085140/4
 26=/home2/st085140
 27=/home2/st085140/zZz
+28=/home2/st085140/5/zZz
+29=/home2/st085140/5/zZz/zZz
+30=/home2/st085140/5/
+31=/home2/st085140/4/zZz/zZz/zZz
+32=/home2/st085140/4_
 
 [inpmc.fm.mkdir]
 0=1
@@ -44,5 +49,9 @@
 6=1_
 7=3
 8=4
-9=zZz
-10=5
+9=5
+10=zZz
+11=cublas
+12=4_
+13=new
+14=4__
