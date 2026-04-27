@@ -1,7 +1,3 @@
-    ! ====================================================================
-    deallocate(A, B_naive, B_tiled, B_copy, A_d, B_naive_d, B_tiled_d, B_copy_d)
-    
-    print *, ''
     print *, '============================================================'
     print *, 'ПРОГРАММА ЗАВЕРШЕНА!'
     print *, '============================================================'
@@ -498,3 +494,7 @@ EOF
 ./matrix_transpose_bank_conflict
 git add .
 mc
+git add .
+git commit -m "Транспонирование"
+git push -f origin main
+
