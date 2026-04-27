@@ -15,11 +15,13 @@ $
 
 # Command Line History (newest to oldest):
 :wq
-|2,0,1777246986,,"wq"
+|2,0,1777258101,,"wq"
+:wq!
+|2,0,1777257187,,"wq!"
 :q
-|2,0,1777244329,,"q"
+|2,0,1777255350,,"q"
 :q!
-|2,0,1777243729,,"q!"
+|2,0,1777251951,,"q!"
 :'<,'>q
 |2,0,1777240436,,"'<,'>q"
 :w
@@ -38,319 +40,677 @@ $
 	
 |3,0,0,1,1,0,1777244327,""
 ""1	LINE	0
-	attributes(global) subroutine vec_add(a, b, c, n)
+	module matrix_kernel_module
+	    use cudafor
 	    implicit none
-	    real(8), device :: a(*), b(*), c(*)
-	    integer, value :: n
-	    integer :: idx
+	    
+	contains
 	
-	    idx = threadIdx%x + (blockIdx%x - 1) * blockDim%x
+	    attributes(global) subroutine add_matrix_kernel(a, b, c, n, m)
+	        real, device :: a(:,:), b(:,:), c(:,:)
+	        integer, value :: n, m
+	        
+	        integer :: i, j
+	        
+	        i = (blockIdx%y - 1) * blockDim%y + threadIdx%y
+	        j = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+	        
+	        if (i <= n .and. j <= m) then
+	            c(i, j) = a(i, j) + b(i, j)
+	        end if
+	        
+	    end subroutine add_matrix_kernel
 	
-	    if (idx <= n) then
-	        c(idx) = a(idx) + b(idx)
-	    end if
-	end subroutine vec_add
+	end module matrix_kernel_module
+|3,1,1,1,22,0,1777258080,"module matrix_kernel_module","    use cudafor","    implicit none","    ","contains","","    attributes(global) subroutine add_matrix_kernel(a, b, c, n, m)","        real, device :: a(:,:), b(:,:), c(:,:)","        integer, value :: n, m","        ","        integer :: i, j","        ","        i = (blockIdx%y - 1) * blockDim%y + threadIdx%y","        j = (blockIdx%x - 1) * blockDim%x + threadIdx%x","        ",>39
+|<"        if (i <= n .and. j <= m) then","            c(i, j) = a(i, j) + b(i, j)","        end if","        ","    end subroutine add_matrix_kernel","","end module matrix_kernel_module"
+"2	LINE	0
+	! ================================================================
+	! ЗАДАНИЕ 1: СЛОЖЕНИЕ МАТРИЦ ПРОИЗВОЛЬНОГО РАЗМЕРА (CPU + GPU)
+	! ================================================================
 	
+	module matrix_kernel_module
+	    use cudafor
+	    implicit none
+	    
+	contains
+	
+	    attributes(global) subroutine add_matrix_kernel(a, b, c, n, m)
+	        real, device, intent(in)  :: a(:,:)
+	        real, device, intent(in)  :: b(:,:)
+	        real, device, intent(out) :: c(:,:)
+	        integer, value, intent(in) :: n, m
+	        
+	        integer :: i, j
+	        
+	        i = (blockIdx%y - 1) * blockDim%y + threadIdx%y
+	        j = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+	        
+	        if (i <= n .and. j <= m) then
+	            c(i, j) = a(i, j) + b(i, j)
+	        end if
+	        
+	    end subroutine add_matrix_kernel
+	
+	end module matrix_kernel_module
+	
+	program matrix_add_interactive
+	    use cudafor
+	    use matrix_kernel_module
+	    implicit none
+	    
+	    integer :: n, m, i, j, istat
+	    real, allocatable :: A(:,:), B(:,:), C_cpu(:,:), C_gpu(:,:)
+	    real, device, allocatable :: A_d(:,:), B_d(:,:), C_d(:,:)
+	    real :: max_diff
+	    
+	    print *, '============================================='
+	    print *, 'СЛОЖЕНИЕ МАТРИЦ НА CPU И GPU'
+	    print *, '============================================='
+	    print *, ''
+	    
+	    print *, 'Введите количество СТРОК матрицы:'
+	    read *, n
+	    print *, 'Введите количество СТОЛБЦОВ матрицы:'
+	    read *, m
+	    
+	    print *, ''
+|3,0,2,1,50,0,1777257328,"! ================================================================","! ЗАДАНИЕ 1: СЛОЖЕНИЕ МАТРИЦ ПРОИЗВОЛЬНОГО РАЗМЕРА (CPU + GPU)","! ================================================================","","module matrix_kernel_module","    use cudafor","    implicit none","    ","contains","","    attributes(global) subroutine add_matrix_kernel(a, b, c, n, m)",>45
+|<"        real, device, intent(in)  :: a(:,:)","        real, device, intent(in)  :: b(:,:)","        real, device, intent(out) :: c(:,:)","        integer, value, intent(in) :: n, m","        ","        integer :: i, j","        ","        i = (blockIdx%y - 1) * blockDim%y + threadIdx%y","        j = (blockIdx%x - 1) * blockDim%x + threadIdx%x","        ","        if (i <= n .and. j <= m) then","            c(i, j) = a(i, j) + b(i, j)","        end if","        ",>38
+|<"    end subroutine add_matrix_kernel","","end module matrix_kernel_module","","program matrix_add_interactive","    use cudafor","    use matrix_kernel_module","    implicit none","    ","    integer :: n, m, i, j, istat","    real, allocatable :: A(:,:), B(:,:), C_cpu(:,:), C_gpu(:,:)","    real, device, allocatable :: A_d(:,:), B_d(:,:), C_d(:,:)","    real :: max_diff","    ","    print *, '============================================='",>62
+|<"    print *, 'СЛОЖЕНИЕ МАТРИЦ НА CPU И GPU'","    print *, '============================================='","    print *, ''","    ","    print *, 'Введите количество СТРОК матрицы:'","    read *, n","    print *, 'Введите количество СТОЛБЦОВ матрицы:'","    read *, m","    ","    print *, ''"
+"3	LINE	0
+	! vec_add.f90
+	! Компиляция: nvfortran vec_add.f90 -o vec_add
+	
+	module vec_add_mod
+	  implicit none
+	  
+	  integer, parameter :: N = 1000000  ! размер векторов
+	  
+	contains
+	
+	  ! Ядро GPU
+	  attributes(global) subroutine vec_add_kernel(a, b, c, n)
+	    real,    intent(in)  :: a(*), b(*)
+	    real,    intent(out) :: c(*)
+	    integer, value       :: n
+	    integer              :: idx
+	
+	    idx = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+	    
+	    if (idx <= n) c(idx) = a(idx) + b(idx)
+	  end subroutine vec_add_kernel
+	
+	  ! Хост-обёртка
+	  subroutine vec_add_gpu(a, b, c)
+	    real, intent(in)  :: a(:), b(:)
+	    real, intent(out) :: c(:)
+	    
+	    real, device, allocatable :: d_a(:), d_b(:), d_c(:)
+	    type(dim3) :: grid, block
+	    integer    :: n, tpb
+	
+	    n   = size(a)
+	    tpb = 256
+	
+	    allocate(d_a(n), d_b(n), d_c(n))
+	
+	    d_a = a      ! H2D
+	    d_b = b      ! H2D
+	
+	    block = dim3(tpb, 1, 1)
+	    grid  = dim3((n + tpb - 1) / tpb, 1, 1)
+	    call vec_add_kernel<<<grid, block>>>(d_a, d_b, d_c, n)
+	
+	    c = d_c      ! D2H
+	
+	    deallocate(d_a, d_b, d_c)
+	  end subroutine vec_add_gpu
+	
+	  ! CPU-версия для проверки
+	  subroutine vec_add_cpu(a, b, c)
+|3,0,3,1,50,0,1777257177,"! vec_add.f90","! Компиляция: nvfortran vec_add.f90 -o vec_add","","module vec_add_mod","  implicit none","  ","  integer, parameter :: N = 1000000  ! размер векторов","  ","contains","","  ! Ядро GPU","  attributes(global) subroutine vec_add_kernel(a, b, c, n)","    real,    intent(in)  :: a(*), b(*)","    real,    intent(out) :: c(*)","    integer, value       :: n","    integer              :: idx","",>55
+|<"    idx = (blockIdx%x - 1) * blockDim%x + threadIdx%x","    ","    if (idx <= n) c(idx) = a(idx) + b(idx)","  end subroutine vec_add_kernel","","  ! Хост-обёртка","  subroutine vec_add_gpu(a, b, c)","    real, intent(in)  :: a(:), b(:)","    real, intent(out) :: c(:)","    ","    real, device, allocatable :: d_a(:), d_b(:), d_c(:)","    type(dim3) :: grid, block","    integer    :: n, tpb","","    n   = size(a)","    tpb = 256","","    allocate(d_a(n), d_b(n), d_c(n))","",>24
+|<"    d_a = a      ! H2D","    d_b = b      ! H2D","","    block = dim3(tpb, 1, 1)","    grid  = dim3((n + tpb - 1) / tpb, 1, 1)","    call vec_add_kernel<<<grid, block>>>(d_a, d_b, d_c, n)","","    c = d_c      ! D2H","","    deallocate(d_a, d_b, d_c)","  end subroutine vec_add_gpu","","  ! CPU-версия для проверки","  subroutine vec_add_cpu(a, b, c)"
+"4	LINE	0
+	! vec_add.f90
+	! Компиляция: nvfortran vec_add.f90 -o vec_add
+	
+	module vec_add_mod
+	  implicit none
+	  
+	  integer, parameter :: N = 1000000  ! размер векторов
+	  
+	contains
+	
+	  ! Ядро GPU
+	  attributes(global) subroutine vec_add_kernel(a, b, c, n)
+	    real,    intent(in)  :: a(*), b(*)
+	    real,    intent(out) :: c(*)
+	    integer, value       :: n
+	    integer              :: idx
+	
+	    idx = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+	    
+	    if (idx <= n) c(idx) = a(idx) + b(idx)
+	  end subroutine vec_add_kernel
+	
+	  ! Хост-обёртка
+	  subroutine vec_add_gpu(a, b, c)
+	    real, intent(in)  :: a(:), b(:)
+	    real, intent(out) :: c(:)
+	    
+	    real, device, allocatable :: d_a(:), d_b(:), d_c(:)
+	    type(dim3) :: grid, block
+	    integer    :: n, tpb
+	
+	    n   = size(a)
+	    tpb = 256
+	
+	    allocate(d_a(n), d_b(n), d_c(n))
+	
+	    d_a = a      ! H2D
+	    d_b = b      ! H2D
+	
+	    block = dim3(tpb, 1, 1)
+	    grid  = dim3((n + tpb - 1) / tpb, 1, 1)
+	    call vec_add_kernel<<<grid, block>>>(d_a, d_b, d_c, n)
+	
+	    c = d_c      ! D2H
+	
+	    deallocate(d_a, d_b, d_c)
+	  end subroutine vec_add_gpu
+	
+	  ! CPU-версия для проверки
+	  subroutine vec_add_cpu(a, b, c)
+|3,0,4,1,50,0,1777257081,"! vec_add.f90","! Компиляция: nvfortran vec_add.f90 -o vec_add","","module vec_add_mod","  implicit none","  ","  integer, parameter :: N = 1000000  ! размер векторов","  ","contains","","  ! Ядро GPU","  attributes(global) subroutine vec_add_kernel(a, b, c, n)","    real,    intent(in)  :: a(*), b(*)","    real,    intent(out) :: c(*)","    integer, value       :: n","    integer              :: idx","",>55
+|<"    idx = (blockIdx%x - 1) * blockDim%x + threadIdx%x","    ","    if (idx <= n) c(idx) = a(idx) + b(idx)","  end subroutine vec_add_kernel","","  ! Хост-обёртка","  subroutine vec_add_gpu(a, b, c)","    real, intent(in)  :: a(:), b(:)","    real, intent(out) :: c(:)","    ","    real, device, allocatable :: d_a(:), d_b(:), d_c(:)","    type(dim3) :: grid, block","    integer    :: n, tpb","","    n   = size(a)","    tpb = 256","","    allocate(d_a(n), d_b(n), d_c(n))","",>24
+|<"    d_a = a      ! H2D","    d_b = b      ! H2D","","    block = dim3(tpb, 1, 1)","    grid  = dim3((n + tpb - 1) / tpb, 1, 1)","    call vec_add_kernel<<<grid, block>>>(d_a, d_b, d_c, n)","","    c = d_c      ! D2H","","    deallocate(d_a, d_b, d_c)","  end subroutine vec_add_gpu","","  ! CPU-версия для проверки","  subroutine vec_add_cpu(a, b, c)"
+"5	LINE	0
+	! utils_module.f90
+	module utils_module
+	    implicit none
+	contains
+	    ! Заполнение вектора случайными числами
+	    subroutine rnd_fill(a)
+	        real, intent(out) :: a(:)
+	        call random_number(a)
+	    end subroutine rnd_fill
+	
+	    ! Проверка равенства двух векторов
+	    function check_equal_vec(a, b, tol) result(is_equal)
+	        real, intent(in) :: a(:), b(:)
+	        real, intent(in), optional :: tol
+	        real :: tolerance
+	        logical :: is_equal
+	        integer :: i
+	        
+	        tolerance = 1.0e-5
+	        if (present(tol)) tolerance = tol
+	        
+	        is_equal = .true.
+	        if (size(a) /= size(b)) then
+	            is_equal = .false.
+	            return
+	        endif
+	        
+	        do i = 1, size(a)
+	            if (abs(a(i) - b(i)) > tolerance) then
+	                is_equal = .false.
+	                return
+	            endif
+	        enddo
+	    end function check_equal_vec
+	end module utils_module
+	
+	! vec_add_cpu.f90
+	module vec_add_cpu_module
+	    implicit none
+	contains
+	    subroutine vec_add_cpu(a, b, c)
+	        real, intent(in) :: a(:), b(:)
+	        real, intent(out) :: c(:)
+	        c = a + b
+	    end subroutine vec_add_cpu
+	end module vec_add_cpu_module
+	
+	! vec_add_module.cuf
+	module vec_add_gpu_module
+	    implicit none
+|3,0,5,1,50,0,1777256059,"! utils_module.f90","module utils_module","    implicit none","contains","    ! Заполнение вектора случайными числами","    subroutine rnd_fill(a)","        real, intent(out) :: a(:)","        call random_number(a)","    end subroutine rnd_fill","","    ! Проверка равенства двух векторов","    function check_equal_vec(a, b, tol) result(is_equal)",>40
+|<"        real, intent(in) :: a(:), b(:)","        real, intent(in), optional :: tol","        real :: tolerance","        logical :: is_equal","        integer :: i","        ","        tolerance = 1.0e-5","        if (present(tol)) tolerance = tol","        ","        is_equal = .true.","        if (size(a) /= size(b)) then","            is_equal = .false.","            return","        endif","        ","        do i = 1, size(a)","            if (abs(a(i) - b(i)) > tolerance) then",>36
+|<"                is_equal = .false.","                return","            endif","        enddo","    end function check_equal_vec","end module utils_module","","! vec_add_cpu.f90","module vec_add_cpu_module","    implicit none","contains","    subroutine vec_add_cpu(a, b, c)","        real, intent(in) :: a(:), b(:)","        real, intent(out) :: c(:)","        c = a + b","    end subroutine vec_add_cpu","end module vec_add_cpu_module","","! vec_add_module.cuf",>27
+|<"module vec_add_gpu_module","    implicit none"
+"6	LINE	0
+	    if (l <= 20) then
+	        print *, "Result vector C = A + B:"
+	        do i = 1, l
+	            write(*, '(F10.4)', advance='no') c_gpu(i)
+	        end do
+	        print *, ""
+	    else
+	        print *, "C(1:10) =", c_gpu(1:10)
+	    endif
+	    print *, "GPU time:", gpu_time, "seconds"
+	    
+	    ! Вычисление GFLOPS для GPU
+	    if (gpu_time > 0.0) then
+	        gflops = real(l) / (gpu_time * 1.0e9)
+	        print *, "GPU Performance:", gflops, "GFLOPS"
+	    endif
+	    print *, ""
+	    
+	    ! Проверка корректности
+	    print *, "=== Verification ==="
+	    if (check_equal_vec(c_cpu, c_gpu)) then
+	        print *, "SUCCESS: CPU and GPU results match!"
+	    else
+	        print *, "ERROR: CPU and GPU results differ!"
+	        if (l <= 20) then
+	            print *, "Differences:"
+	            do i = 1, l
+	                if (abs(c_cpu(i) - c_gpu(i)) > 1.0e-5) then
+	                    print *, "Element", i, ": CPU =", c_cpu(i), "GPU =", c_gpu(i)
+	                endif
+	            end do
+	        endif
+	    endif
+	    
+	    ! Сравнение производительности
+	    if (cpu_time > 0.0 .and. gpu_time > 0.0) then
+	        print *, ""
+	        print *, "=== Performance Comparison ==="
+	        print *, "Speedup (CPU/GPU):", cpu_time / gpu_time, "x"
+	    endif
+	    
+	    ! Очистка
+	    deallocate(a, b, c_cpu, c_gpu)
+	    
+	end program main
+|3,0,6,1,45,0,1777255389,"    if (l <= 20) then","        print *, \"Result vector C = A + B:\"","        do i = 1, l","            write(*, '(F10.4)', advance='no') c_gpu(i)","        end do","        print *, \"\"","    else","        print *, \"C(1:10) =\", c_gpu(1:10)","    endif","    print *, \"GPU time:\", gpu_time, \"seconds\"","    ","    ! Вычисление GFLOPS для GPU","    if (gpu_time > 0.0) then",>47
+|<"        gflops = real(l) / (gpu_time * 1.0e9)","        print *, \"GPU Performance:\", gflops, \"GFLOPS\"","    endif","    print *, \"\"","    ","    ! Проверка корректности","    print *, \"=== Verification ===\"","    if (check_equal_vec(c_cpu, c_gpu)) then","        print *, \"SUCCESS: CPU and GPU results match!\"","    else","        print *, \"ERROR: CPU and GPU results differ!\"","        if (l <= 20) then","            print *, \"Differences:\"",>25
+|<"            do i = 1, l","                if (abs(c_cpu(i) - c_gpu(i)) > 1.0e-5) then","                    print *, \"Element\", i, \": CPU =\", c_cpu(i), \"GPU =\", c_gpu(i)","                endif","            end do","        endif","    endif","    ","    ! Сравнение производительности","    if (cpu_time > 0.0 .and. gpu_time > 0.0) then","        print *, \"\"","        print *, \"=== Performance Comparison ===\"",>69
+|<"        print *, \"Speedup (CPU/GPU):\", cpu_time / gpu_time, \"x\"","    endif","    ","    ! Очистка","    deallocate(a, b, c_cpu, c_gpu)","    ","end program main"
+"7	LINE	0
+	! utils_module.f90
+	module utils_module
+	    implicit none
+	contains
+	    ! Заполнение вектора случайными числами
+	    subroutine rnd_fill(a)
+	        real, intent(out) :: a(:)
+	        call random_number(a)
+	    end subroutine rnd_fill
+	
+	    ! Проверка равенства двух векторов
+	    function check_equal_vec(a, b, tol) result(is_equal)
+	        real, intent(in) :: a(:), b(:)
+	        real, intent(in), optional :: tol
+	        real :: tolerance
+	        logical :: is_equal
+	        integer :: i
+	        
+	        tolerance = 1.0e-5
+	        if (present(tol)) tolerance = tol
+	        
+	        is_equal = .true.
+	        if (size(a) /= size(b)) then
+	            is_equal = .false.
+	            return
+	        endif
+	        
+	        do i = 1, size(a)
+	            if (abs(a(i) - b(i)) > tolerance) then
+	                is_equal = .false.
+	                return
+	            endif
+	        enddo
+	    end function check_equal_vec
+	end module utils_module
+	
+	! vec_add_cpu.f90
+	module vec_add_cpu_module
+	    implicit none
+	contains
+	    subroutine vec_add_cpu(a, b, c)
+	        real, intent(in) :: a(:), b(:)
+	        real, intent(out) :: c(:)
+	        c = a + b
+	    end subroutine vec_add_cpu
+	end module vec_add_cpu_module
+	
+	! vec_add_module.cuf
+	module vec_add_gpu_module
+	    implicit none
+|3,0,7,1,50,0,1777255387,"! utils_module.f90","module utils_module","    implicit none","contains","    ! Заполнение вектора случайными числами","    subroutine rnd_fill(a)","        real, intent(out) :: a(:)","        call random_number(a)","    end subroutine rnd_fill","","    ! Проверка равенства двух векторов","    function check_equal_vec(a, b, tol) result(is_equal)",>40
+|<"        real, intent(in) :: a(:), b(:)","        real, intent(in), optional :: tol","        real :: tolerance","        logical :: is_equal","        integer :: i","        ","        tolerance = 1.0e-5","        if (present(tol)) tolerance = tol","        ","        is_equal = .true.","        if (size(a) /= size(b)) then","            is_equal = .false.","            return","        endif","        ","        do i = 1, size(a)","            if (abs(a(i) - b(i)) > tolerance) then",>36
+|<"                is_equal = .false.","                return","            endif","        enddo","    end function check_equal_vec","end module utils_module","","! vec_add_cpu.f90","module vec_add_cpu_module","    implicit none","contains","    subroutine vec_add_cpu(a, b, c)","        real, intent(in) :: a(:), b(:)","        real, intent(out) :: c(:)","        c = a + b","    end subroutine vec_add_cpu","end module vec_add_cpu_module","","! vec_add_module.cuf",>27
+|<"module vec_add_gpu_module","    implicit none"
+"8	LINE	0
 	program rowl_plus_rowl_gpu
 	    use cudafor
 	    implicit none
 	
 	    integer :: l, i
-	    real(8), allocatable :: A(:), B(:), C(:)
-	    real(8), device, allocatable :: dA(:), dB(:), dC(:)
-	    character(len=100) :: filename
-	    integer :: unit
-	    integer :: threads, blocks
+	    real, allocatable :: A(:), B(:), C(:)
+	    real :: t1, t2, elapsed, gflops
 	
-	    integer :: count_rate, count_max
-	    integer :: t1, t2
-	
+	    ! ===== Ввод =====
 	    print *, "Enter vector length l:"
 	    read *, l
 	
-	    if (l <= 0) then
-	        print *, "Invalid l"
-	        stop
-	    end if
-	
+	    ! ===== Выделение памяти =====
 	    allocate(A(l), B(l), C(l))
-	    allocate(dA(l), dB(l), dC(l))
 	
+	    ! ===== Заполнение случайными числами =====
 	    call random_seed()
+	    call random_number(A)
+	    call random_number(B)
 	
+	    ! ===== Замер времени =====
+	    call cpu_time(t1)
+	
+	    call rowl_plus_rowl_gpu_sub(A, B, C)
+	
+	    call cpu_time(t2)
+	
+	    elapsed = t2 - t1
+	
+	    ! ===== GFLOPS =====
+	    ! 1 операция сложения на элемент
+	    gflops = real(l) / (elapsed * 1.0e9)
+	
+	    ! ===== Запись в файл =====
+	    open(unit=10, file="output.txt", status="replace")
+	
+	    write(10,*) "Vector A:"
 	    do i = 1, l
-	        call random_number(A(i))
-	        call random_number(B(i))
+	        write(10,*) A(i)
 	    end do
 	
-	    dA = A
-	    dB = B
+	    write(10,*) "Vector B:"
+	    do i = 1, l
+	        write(10,*) B(i)
+	    end do
 	
-	    threads = 256
-	    blocks = (l + threads - 1) / threads
-|3,1,1,1,50,0,1777246979,"attributes(global) subroutine vec_add(a, b, c, n)","    implicit none","    real(8), device :: a(*), b(*), c(*)","    integer, value :: n","    integer :: idx","","    idx = threadIdx%x + (blockIdx%x - 1) * blockDim%x","","    if (idx <= n) then","        c(idx) = a(idx) + b(idx)","    end if","end subroutine vec_add","","program rowl_plus_rowl_gpu","    use cudafor","    implicit none","","    integer :: l, i",>46
-|<"    real(8), allocatable :: A(:), B(:), C(:)","    real(8), device, allocatable :: dA(:), dB(:), dC(:)","    character(len=100) :: filename","    integer :: unit","    integer :: threads, blocks","","    integer :: count_rate, count_max","    integer :: t1, t2","","    print *, \"Enter vector length l:\"","    read *, l","","    if (l <= 0) then","        print *, \"Invalid l\"","        stop","    end if","","    allocate(A(l), B(l), C(l))","    allocate(dA(l), dB(l), dC(l))","",>24
-|<"    call random_seed()","","    do i = 1, l","        call random_number(A(i))","        call random_number(B(i))","    end do","","    dA = A","    dB = B","","    threads = 256","    blocks = (l + threads - 1) / threads"
-"2	LINE	0
-	
-|3,0,2,1,1,0,1777246607,""
-"3	LINE	0
-	end subroutine vec_add
-|3,0,3,1,1,0,1777246606,"end subroutine vec_add"
-"4	LINE	0
-	    end if
-|3,0,4,1,1,0,1777246606,"    end if"
-"5	LINE	0
-	        c(idx) = a(idx) + b(idx)
-|3,0,5,1,1,0,1777246606,"        c(idx) = a(idx) + b(idx)"
-"6	LINE	0
-	    if (idx <= n) then
-|3,0,6,1,1,0,1777246605,"    if (idx <= n) then"
-"7	LINE	0
-	
-|3,0,7,1,1,0,1777246605,""
-"8	LINE	0
-	    idx = threadIdx%x + (blockIdx%x - 1) * blockDim%x
-|3,0,8,1,1,0,1777246604,"    idx = threadIdx%x + (blockIdx%x - 1) * blockDim%x"
+	    write(10,*) "Vector C = A + B:"
+	    do i = 1, l
+	        write(10,*) C(i)
+	    end do
+|3,0,8,1,50,0,1777254871,"program rowl_plus_rowl_gpu","    use cudafor","    implicit none","","    integer :: l, i","    real, allocatable :: A(:), B(:), C(:)","    real :: t1, t2, elapsed, gflops","","    ! ===== Ввод =====","    print *, \"Enter vector length l:\"","    read *, l","","    ! ===== Выделение памяти =====","    allocate(A(l), B(l), C(l))","","    ! ===== Заполнение случайными числами =====",>24
+|<"    call random_seed()","    call random_number(A)","    call random_number(B)","","    ! ===== Замер времени =====","    call cpu_time(t1)","","    call rowl_plus_rowl_gpu_sub(A, B, C)","","    call cpu_time(t2)","","    elapsed = t2 - t1","","    ! ===== GFLOPS =====","    ! 1 операция сложения на элемент","    gflops = real(l) / (elapsed * 1.0e9)","","    ! ===== Запись в файл =====",>60
+|<"    open(unit=10, file=\"output.txt\", status=\"replace\")","","    write(10,*) \"Vector A:\"","    do i = 1, l","        write(10,*) A(i)","    end do","","    write(10,*) \"Vector B:\"","    do i = 1, l","        write(10,*) B(i)","    end do","","    write(10,*) \"Vector C = A + B:\"","    do i = 1, l","        write(10,*) C(i)","    end do"
 "9	LINE	0
-	
-|3,0,9,1,1,0,1777246604,""
+	end subroutine
+|3,0,9,1,1,0,1777254634,"end subroutine"
 "-	CHAR	0
-	
-	
-|3,0,36,0,2,0,1777243722,"",""
+	u
+|3,0,36,0,1,0,1777250024,"u"
 
 # File marks:
-'0  1  29  ~/1/rowl_plus_rowl_gpu.cuf
-|4,48,1,29,1777246986,"~/1/rowl_plus_rowl_gpu.cuf"
-'1  12  21  ~/1/rowl_plus_rowl_gpu.cuf
-|4,49,12,21,1777246621,"~/1/rowl_plus_rowl_gpu.cuf"
-'2  1  3  ~/1/rowl_plus_rowl_gpu.cuf
-|4,50,1,3,1777246561,"~/1/rowl_plus_rowl_gpu.cuf"
-'3  1  3  ~/1/rowl_plus_rowl_gpu.cuf
-|4,51,1,3,1777246561,"~/1/rowl_plus_rowl_gpu.cuf"
-'4  93  3  ~/1/rowl_plus_rowl_gpu.cuf
-|4,52,93,3,1777246561,"~/1/rowl_plus_rowl_gpu.cuf"
-'5  92  3  ~/1/rowl_plus_rowl_gpu.cuf
-|4,53,92,3,1777246561,"~/1/rowl_plus_rowl_gpu.cuf"
-'6  1  21  ~/1/rowl_plus_rowl_gpu.cuf
-|4,54,1,21,1777246366,"~/1/rowl_plus_rowl_gpu.cuf"
-'7  1  21  ~/1/rowl_plus_rowl_gpu.cuf
-|4,55,1,21,1777246366,"~/1/rowl_plus_rowl_gpu.cuf"
-'8  93  21  ~/1/rowl_plus_rowl_gpu.cuf
-|4,56,93,21,1777246366,"~/1/rowl_plus_rowl_gpu.cuf"
-'9  91  21  ~/1/rowl_plus_rowl_gpu.cuf
-|4,57,91,21,1777246366,"~/1/rowl_plus_rowl_gpu.cuf"
+'0  1  18  ~/1/matrix_add.f90
+|4,48,1,18,1777258101,"~/1/matrix_add.f90"
+'1  22  30  ~/1/matrix_add.f90
+|4,49,22,30,1777257334,"~/1/matrix_add.f90"
+'2  118  33  ~/1/vec_add.f90
+|4,50,118,33,1777257187,"~/1/vec_add.f90"
+'3  1  0  ~/1/vec_add.f90
+|4,51,1,0,1777257122,"~/1/vec_add.f90"
+'4  1  0  ~/1/vec_add.f90
+|4,52,1,0,1777257122,"~/1/vec_add.f90"
+'5  144  26  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,53,144,26,1777256065,"~/1/rowl_plus_rowl_gpu_2.cuf"
+'6  1  15  ~/1/vec_add.f90
+|4,54,1,15,1777255394,"~/1/vec_add.f90"
+'7  93  15  ~/1/vec_add.f90
+|4,55,93,15,1777255394,"~/1/vec_add.f90"
+'8  1  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,56,1,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
+'9  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,57,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
 
 # Jumplist (newest first):
--'  1  29  ~/1/rowl_plus_rowl_gpu.cuf
-|4,39,1,29,1777246986,"~/1/rowl_plus_rowl_gpu.cuf"
--'  12  21  ~/1/rowl_plus_rowl_gpu.cuf
-|4,39,12,21,1777246621,"~/1/rowl_plus_rowl_gpu.cuf"
--'  93  3  ~/1/rowl_plus_rowl_gpu.cuf
-|4,39,93,3,1777246592,"~/1/rowl_plus_rowl_gpu.cuf"
--'  92  3  ~/1/rowl_plus_rowl_gpu.cuf
-|4,39,92,3,1777246561,"~/1/rowl_plus_rowl_gpu.cuf"
--'  91  21  ~/1/rowl_plus_rowl_gpu.cuf
-|4,39,91,21,1777246366,"~/1/rowl_plus_rowl_gpu.cuf"
--'  1  0  ~/1/rowl_plus_rowl_gpu.cuf
-|4,39,1,0,1777246342,"~/1/rowl_plus_rowl_gpu.cuf"
--'  1  0  ~/1/rowl_plus_rowl_gpu.cuf
-|4,39,1,0,1777246342,"~/1/rowl_plus_rowl_gpu.cuf"
--'  1  0  ~/1/rowl_plus_rowl_gpu.cuf
-|4,39,1,0,1777246342,"~/1/rowl_plus_rowl_gpu.cuf"
--'  1  0  ~/1/rowl_plus_rowl_gpu.cuf
-|4,39,1,0,1777246286,"~/1/rowl_plus_rowl_gpu.cuf"
--'  1  25  ~/1/rowl_plus_rowl_gpu.f90
-|4,39,1,25,1777245771,"~/1/rowl_plus_rowl_gpu.f90"
--'  1  25  ~/1/rowl_plus_rowl_gpu.f90
-|4,39,1,25,1777245771,"~/1/rowl_plus_rowl_gpu.f90"
--'  1  25  ~/1/rowl_plus_rowl_gpu.f90
-|4,39,1,25,1777245771,"~/1/rowl_plus_rowl_gpu.f90"
--'  1  25  ~/1/rowl_plus_rowl_gpu.f90
-|4,39,1,25,1777245771,"~/1/rowl_plus_rowl_gpu.f90"
--'  1  25  ~/1/rowl_plus_rowl_gpu.f90
-|4,39,1,25,1777245771,"~/1/rowl_plus_rowl_gpu.f90"
--'  1  25  ~/1/rowl_plus_rowl_gpu.f90
-|4,39,1,25,1777245771,"~/1/rowl_plus_rowl_gpu.f90"
--'  1  25  ~/1/rowl_plus_rowl_gpu.f90
-|4,39,1,25,1777245771,"~/1/rowl_plus_rowl_gpu.f90"
--'  1  25  ~/1/rowl_plus_rowl_gpu.f90
-|4,39,1,25,1777245771,"~/1/rowl_plus_rowl_gpu.f90"
--'  1  25  ~/1/rowl_plus_rowl_gpu.f90
-|4,39,1,25,1777245771,"~/1/rowl_plus_rowl_gpu.f90"
--'  1  25  ~/1/rowl_plus_rowl_gpu.f90
-|4,39,1,25,1777245771,"~/1/rowl_plus_rowl_gpu.f90"
--'  1  25  ~/1/rowl_plus_rowl_gpu.f90
-|4,39,1,25,1777245771,"~/1/rowl_plus_rowl_gpu.f90"
--'  1  25  ~/1/rowl_plus_rowl_gpu.f90
-|4,39,1,25,1777245771,"~/1/rowl_plus_rowl_gpu.f90"
--'  1  25  ~/1/rowl_plus_rowl_gpu.f90
-|4,39,1,25,1777245771,"~/1/rowl_plus_rowl_gpu.f90"
--'  1  25  ~/1/rowl_plus_rowl_gpu.f90
-|4,39,1,25,1777245771,"~/1/rowl_plus_rowl_gpu.f90"
--'  1  25  ~/1/rowl_plus_rowl_gpu.f90
-|4,39,1,25,1777245771,"~/1/rowl_plus_rowl_gpu.f90"
--'  1  25  ~/1/rowl_plus_rowl_gpu.f90
-|4,39,1,25,1777245771,"~/1/rowl_plus_rowl_gpu.f90"
--'  1  25  ~/1/rowl_plus_rowl_gpu.f90
-|4,39,1,25,1777245771,"~/1/rowl_plus_rowl_gpu.f90"
--'  1  25  ~/1/rowl_plus_rowl_gpu.f90
-|4,39,1,25,1777245771,"~/1/rowl_plus_rowl_gpu.f90"
--'  1  25  ~/1/rowl_plus_rowl_gpu.f90
-|4,39,1,25,1777245771,"~/1/rowl_plus_rowl_gpu.f90"
--'  1  25  ~/1/rowl_plus_rowl_gpu.f90
-|4,39,1,25,1777245771,"~/1/rowl_plus_rowl_gpu.f90"
--'  1  25  ~/1/rowl_plus_rowl_gpu.f90
-|4,39,1,25,1777245771,"~/1/rowl_plus_rowl_gpu.f90"
--'  1  25  ~/1/rowl_plus_rowl_gpu.f90
-|4,39,1,25,1777245771,"~/1/rowl_plus_rowl_gpu.f90"
--'  1  25  ~/1/rowl_plus_rowl_gpu.f90
-|4,39,1,25,1777245771,"~/1/rowl_plus_rowl_gpu.f90"
--'  1  25  ~/1/rowl_plus_rowl_gpu.f90
-|4,39,1,25,1777245771,"~/1/rowl_plus_rowl_gpu.f90"
--'  1  25  ~/1/rowl_plus_rowl_gpu.f90
-|4,39,1,25,1777245771,"~/1/rowl_plus_rowl_gpu.f90"
--'  1  25  ~/1/rowl_plus_rowl_gpu.f90
-|4,39,1,25,1777245771,"~/1/rowl_plus_rowl_gpu.f90"
--'  1  25  ~/1/rowl_plus_rowl_gpu.f90
-|4,39,1,25,1777245771,"~/1/rowl_plus_rowl_gpu.f90"
--'  1  25  ~/1/rowl_plus_rowl_gpu.f90
-|4,39,1,25,1777245771,"~/1/rowl_plus_rowl_gpu.f90"
--'  1  25  ~/1/rowl_plus_rowl_gpu.f90
-|4,39,1,25,1777245771,"~/1/rowl_plus_rowl_gpu.f90"
--'  1  25  ~/1/rowl_plus_rowl_gpu.f90
-|4,39,1,25,1777245771,"~/1/rowl_plus_rowl_gpu.f90"
--'  1  25  ~/1/rowl_plus_rowl_gpu.f90
-|4,39,1,25,1777245771,"~/1/rowl_plus_rowl_gpu.f90"
--'  1  25  ~/1/rowl_plus_rowl_gpu.f90
-|4,39,1,25,1777245771,"~/1/rowl_plus_rowl_gpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
--'  1  33  ~/1/matrixkl_plus_matrixkl_cpu.f90
-|4,39,1,33,1777245213,"~/1/matrixkl_plus_matrixkl_cpu.f90"
+-'  1  18  ~/1/matrix_add.f90
+|4,39,1,18,1777258101,"~/1/matrix_add.f90"
+-'  22  30  ~/1/matrix_add.f90
+|4,39,22,30,1777257334,"~/1/matrix_add.f90"
+-'  1  0  ~/1/matrix_add.f90
+|4,39,1,0,1777257324,"~/1/matrix_add.f90"
+-'  118  33  ~/1/vec_add.f90
+|4,39,118,33,1777257187,"~/1/vec_add.f90"
+-'  118  33  ~/1/vec_add.f90
+|4,39,118,33,1777257187,"~/1/vec_add.f90"
+-'  118  33  ~/1/vec_add.f90
+|4,39,118,33,1777257187,"~/1/vec_add.f90"
+-'  118  33  ~/1/vec_add.f90
+|4,39,118,33,1777257187,"~/1/vec_add.f90"
+-'  1  0  ~/1/vec_add.f90
+|4,39,1,0,1777257170,"~/1/vec_add.f90"
+-'  1  0  ~/1/vec_add.f90
+|4,39,1,0,1777257170,"~/1/vec_add.f90"
+-'  1  0  ~/1/vec_add.f90
+|4,39,1,0,1777257170,"~/1/vec_add.f90"
+-'  1  0  ~/1/vec_add.f90
+|4,39,1,0,1777257170,"~/1/vec_add.f90"
+-'  1  0  ~/1/vec_add.f90
+|4,39,1,0,1777257122,"~/1/vec_add.f90"
+-'  1  0  ~/1/vec_add.f90
+|4,39,1,0,1777257122,"~/1/vec_add.f90"
+-'  1  0  ~/1/vec_add.f90
+|4,39,1,0,1777257122,"~/1/vec_add.f90"
+-'  1  0  ~/1/vec_add.f90
+|4,39,1,0,1777257122,"~/1/vec_add.f90"
+-'  144  26  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,144,26,1777256065,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  144  26  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,144,26,1777256065,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  144  26  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,144,26,1777256065,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  144  26  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,144,26,1777256065,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  144  26  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,144,26,1777256065,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  144  26  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,144,26,1777256065,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  144  26  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,144,26,1777256065,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  144  26  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,144,26,1777256065,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  144  26  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,144,26,1777256065,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  144  26  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,144,26,1777256065,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  144  26  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,144,26,1777256065,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  144  26  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,144,26,1777256065,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  144  26  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,144,26,1777256065,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  144  26  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,144,26,1777256065,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  144  26  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,144,26,1777256065,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  144  26  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,144,26,1777256065,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  1  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,1,15,1777256055,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  1  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,1,15,1777256055,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  1  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,1,15,1777256055,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  1  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,1,15,1777256055,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  1  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,1,15,1777256055,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  1  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,1,15,1777256055,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  1  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,1,15,1777256055,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  1  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,1,15,1777256055,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  1  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,1,15,1777256055,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  1  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,1,15,1777256055,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  1  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,1,15,1777256055,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  1  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,1,15,1777256055,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  1  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,1,15,1777256055,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  1  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,1,15,1777256055,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  1  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,1,15,1777256055,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  1  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,1,15,1777256055,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  93  15  ~/1/vec_add.f90
+|4,39,93,15,1777255394,"~/1/vec_add.f90"
+-'  93  15  ~/1/vec_add.f90
+|4,39,93,15,1777255394,"~/1/vec_add.f90"
+-'  93  15  ~/1/vec_add.f90
+|4,39,93,15,1777255394,"~/1/vec_add.f90"
+-'  93  15  ~/1/vec_add.f90
+|4,39,93,15,1777255394,"~/1/vec_add.f90"
+-'  93  15  ~/1/vec_add.f90
+|4,39,93,15,1777255394,"~/1/vec_add.f90"
+-'  93  15  ~/1/vec_add.f90
+|4,39,93,15,1777255394,"~/1/vec_add.f90"
+-'  93  15  ~/1/vec_add.f90
+|4,39,93,15,1777255394,"~/1/vec_add.f90"
+-'  93  15  ~/1/vec_add.f90
+|4,39,93,15,1777255394,"~/1/vec_add.f90"
+-'  1  0  ~/1/vec_add.f90
+|4,39,1,0,1777255384,"~/1/vec_add.f90"
+-'  1  0  ~/1/vec_add.f90
+|4,39,1,0,1777255384,"~/1/vec_add.f90"
+-'  1  0  ~/1/vec_add.f90
+|4,39,1,0,1777255384,"~/1/vec_add.f90"
+-'  1  0  ~/1/vec_add.f90
+|4,39,1,0,1777255384,"~/1/vec_add.f90"
+-'  1  0  ~/1/vec_add.f90
+|4,39,1,0,1777255384,"~/1/vec_add.f90"
+-'  1  0  ~/1/vec_add.f90
+|4,39,1,0,1777255384,"~/1/vec_add.f90"
+-'  1  0  ~/1/vec_add.f90
+|4,39,1,0,1777255384,"~/1/vec_add.f90"
+-'  1  0  ~/1/vec_add.f90
+|4,39,1,0,1777255384,"~/1/vec_add.f90"
+-'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
+-'  246  15  ~/1/rowl_plus_rowl_gpu_2.cuf
+|4,39,246,15,1777254879,"~/1/rowl_plus_rowl_gpu_2.cuf"
 
 # History of marks within files (newest to oldest):
 
+> ~/1/matrix_add.f90
+	*	1777258098	0
+	"	1	18
+	^	1	19
+	.	108	2
+	+	1	27
+	+	1	93
+	+	108	2
+
+> ~/1/vec_add.f90
+	*	1777257184	0
+	"	118	33
+	^	118	34
+	.	118	33
+	+	1	13
+	+	1	66
+	+	118	33
+
+> ~/1/rowl_plus_rowl_gpu_2.cuf
+	*	1777256064	0
+	"	144	26
+	^	144	27
+	.	144	26
+	+	1	31
+	+	166	34
+	+	1	26
+	+	1	13
+	+	1	0
+	+	1	18
+	+	1	66
+	+	144	26
+
 > ~/1/rowl_plus_rowl_gpu.cuf
-	*	1777246984	0
-	"	1	29
-	^	1	30
-	.	94	29
+	*	1777251962	0
+	"	86	39
+	^	86	40
+	.	86	39
 	+	1	1610
 	+	1	26
 	+	1	30
@@ -359,7 +719,27 @@ $
 	+	1	3
 	+	1	0
 	+	1	49
-	+	94	29
+	+	1	26
+	+	1	21
+	+	1	26
+	+	1	65
+	+	1	26
+	+	1	47
+	+	1	26
+	+	1	29
+	+	1	26
+	+	1	25
+	+	1	15
+	+	1	26
+	+	86	39
+
+> ~/1/columnk_plus_columnk_gpu.cuf
+	*	1777247467	0
+	"	94	35
+	^	94	36
+	.	94	35
+	+	1	49
+	+	94	35
 
 > ~/1/rowl_plus_rowl_gpu.f90
 	*	1777245769	0

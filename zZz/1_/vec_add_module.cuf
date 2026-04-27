@@ -1,0 +1,58 @@
+module vec_add_module
+    use cudafor
+    implicit none
+    private
+    public :: vec_add_gpu
+
+contains
+
+    ! GPU-ядро: один поток считает один элемент c(idx) = a(idx) + b(idx).
+    attributes(global) subroutine vec_add_kernel(a, b, c, n)
+        implicit none
+        !----
+        real,    intent(in)  :: a(*), b(*)
+        real,    intent(out) :: c(*)
+        integer, value       :: n
+        integer :: idx
+        !----
+        !  Глобальный индекс потока
+        !----
+        idx = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+        
+        if (idx <= n) c(idx) = a(idx) + b(idx)
+
+    end subroutine vec_add_kernel
+
+    ! Хост-обертка: выделение памяти на GPU, запуск ядра и копирование результата.
+    subroutine vec_add_gpu(a, b, c, threads_per_block)
+        implicit none
+        !----
+        real,    intent(in)           :: a(:), b(:)
+        real,    intent(out)          :: c(:)
+        integer, intent(in), optional :: threads_per_block
+
+        real,    device, allocatable :: d_a(:), d_b(:), d_c(:)
+        type(dim3) :: grid, block
+        integer    :: n, tpb, istat
+        !----
+        n   = size(a)
+        tpb = 256
+        if (present(threads_per_block)) tpb = threads_per_block
+
+        allocate(d_a(n), d_b(n), d_c(n), stat=istat)
+        if (istat /= 0) then
+            write(*,'(a)') 'Memory allocation error in vec_add_gpu'
+            stop 1
+        end if
+        d_a = a
+        d_b = b
+
+        block = dim3(tpb, 1, 1)
+        grid  = dim3((n + tpb - 1) / tpb, 1, 1)
+        call vec_add_kernel<<<grid, block>>>(d_a, d_b, d_c, n)
+
+        c = d_c
+        deallocate(d_a, d_b, d_c)
+    end subroutine vec_add_gpu
+
+end module vec_add_module

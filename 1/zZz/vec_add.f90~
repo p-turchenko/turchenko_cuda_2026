@@ -1,0 +1,93 @@
+! vec_add.f90
+! Компиляция: nvfortran vec_add.f90 -o vec_add
+
+module vec_add_mod
+  implicit none
+  
+  integer, parameter :: N = 1000000  ! размер векторов
+  
+contains
+
+  ! Ядро GPU
+  attributes(global) subroutine vec_add_kernel(a, b, c, n)
+    real,    intent(in)  :: a(*), b(*)
+    real,    intent(out) :: c(*)
+    integer, value       :: n
+    integer              :: idx
+
+    idx = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+    
+    if (idx <= n) c(idx) = a(idx) + b(idx)
+  end subroutine vec_add_kernel
+
+  ! Хост-обёртка
+  subroutine vec_add_gpu(a, b, c)
+    real, intent(in)  :: a(:), b(:)
+    real, intent(out) :: c(:)
+    
+    real, device, allocatable :: d_a(:), d_b(:), d_c(:)
+    type(dim3) :: grid, block
+    integer    :: n, tpb
+
+    n   = size(a)
+    tpb = 256
+
+    allocate(d_a(n), d_b(n), d_c(n))
+
+    d_a = a      ! H2D
+    d_b = b      ! H2D
+
+    block = dim3(tpb, 1, 1)
+    grid  = dim3((n + tpb - 1) / tpb, 1, 1)
+    call vec_add_kernel<<<grid, block>>>(d_a, d_b, d_c, n)
+
+    c = d_c      ! D2H
+
+    deallocate(d_a, d_b, d_c)
+  end subroutine vec_add_gpu
+
+  ! CPU-версия для проверки
+  subroutine vec_add_cpu(a, b, c)
+    real, intent(in)  :: a(:), b(:)
+    real, intent(out) :: c(:)
+    c = a + b
+  end subroutine vec_add_cpu
+
+end module vec_add_mod
+
+program main
+  use vec_add_mod
+  implicit none
+  
+  real, allocatable :: a(:), b(:), c_cpu(:), c_gpu(:)
+  real    :: maxerr
+  integer :: i
+
+  allocate(a(N), b(N), c_cpu(N), c_gpu(N))
+
+  ! Заполняем случайными числами
+  call random_number(a)
+  call random_number(b)
+
+  ! Считаем на CPU
+  call vec_add_cpu(a, b, c_cpu)
+
+  ! Считаем на GPU
+  call vec_add_gpu(a, b, c_gpu)
+
+  ! Проверяем
+  maxerr = maxval(abs(c_cpu - c_gpu))
+  
+  print *, "Размер вектора:", N
+  print *, "Пример: a(1)=", a(1), " b(1)=", b(1)
+  print *, "CPU: c(1)=", c_cpu(1), " GPU: c(1)=", c_gpu(1)
+  print *, "Максимальная ошибка:", maxerr
+
+  if (maxerr < 1.0e-5) then
+    print *, "✓ Проверка пройдена!"
+  else
+    print *, "✗ Ошибка проверки!"
+  end if
+
+  deallocate(a, b, c_cpu, c_gpu)
+end program main

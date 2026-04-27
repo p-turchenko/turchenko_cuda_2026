@@ -1,0 +1,22 @@
+module matrix_kernel_module
+    use cudafor
+    implicit none
+    
+contains
+
+    attributes(global) subroutine add_matrix_kernel(a, b, c, n, m)
+        real, device :: a(:,:), b(:,:), c(:,:)
+        integer, value :: n, m
+        
+        integer :: i, j
+        
+        i = (blockIdx%y - 1) * blockDim%y + threadIdx%y
+        j = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+        
+        if (i <= n .and. j <= m) then
+            c(i, j) = a(i, j) + b(i, j)
+        end if
+        
+    end subroutine add_matrix_kernel
+
+end module matrix_kernel_module

@@ -1,0 +1,94 @@
+attributes(global) subroutine vec_add(a, b, c, n)
+    implicit none
+    real(8), device :: a(*), b(*), c(*)
+    integer, value :: n
+    integer :: idx
+
+    idx = threadIdx%x + (blockIdx%x - 1) * blockDim%x
+
+    if (idx <= n) then
+        c(idx) = a(idx) + b(idx)
+    end if
+end subroutine vec_add
+
+
+program columnk_plus_columnk_gpu
+    use cudafor
+    implicit none
+
+    integer :: k, i
+    real(8), allocatable :: A(:), B(:), C(:)
+    real(8), device, allocatable :: dA(:), dB(:), dC(:)
+    character(len=100) :: filename
+    integer :: unit
+    integer :: threads, blocks
+
+    integer :: count_rate, count_max
+    integer :: t1, t2
+    integer :: ierr
+
+    print *, "Enter vector length k:"
+    read *, k
+
+    if (k <= 0) then
+        print *, "Invalid k"
+        stop
+    end if
+
+    allocate(A(k), B(k), C(k))
+    allocate(dA(k), dB(k), dC(k))
+
+    call random_seed()
+
+    do i = 1, k
+        call random_number(A(i))
+        call random_number(B(i))
+    end do
+
+    dA = A
+    dB = B
+
+    threads = 256
+    blocks = (k + threads - 1) / threads
+
+    call system_clock(t1, count_rate, count_max)
+
+    call vec_add<<<blocks, threads>>>(dA, dB, dC, k)
+
+    ierr = cudaDeviceSynchronize()
+
+    call system_clock(t2, count_rate, count_max)
+
+    C = dC
+
+    filename = "columnk_plus_columnk_gpu.out"
+    open(newunit=unit, file=filename, status="replace", action="write")
+
+    write(unit,*) "k =", k
+
+    write(unit,*) "Vector A:"
+    do i = 1, k
+        write(unit,*) A(i)
+    end do
+
+    write(unit,*) "Vector B:"
+    do i = 1, k
+        write(unit,*) B(i)
+    end do
+
+    write(unit,*) "Vector C = A + B:"
+    do i = 1, k
+        write(unit,*) C(i)
+    end do
+
+    write(unit,*) "Time (s): ", real(t2 - t1) / count_rate
+    write(unit,*) "GFLOPS: ", dble(k) / (real(t2 - t1) / count_rate) / 1.0d9
+
+    close(unit)
+
+    print *, "Done. Output written to ", filename
+
+    deallocate(A, B, C)
+    deallocate(dA, dB, dC)
+
+end program columnk_plus_columnk_gpu

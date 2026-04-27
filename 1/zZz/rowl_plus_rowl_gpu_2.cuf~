@@ -1,0 +1,246 @@
+! utils_module.f90
+module utils_module
+    implicit none
+contains
+    ! Заполнение вектора случайными числами
+    subroutine rnd_fill(a)
+        real, intent(out) :: a(:)
+        call random_number(a)
+    end subroutine rnd_fill
+
+    ! Проверка равенства двух векторов
+    function check_equal_vec(a, b, tol) result(is_equal)
+        real, intent(in) :: a(:), b(:)
+        real, intent(in), optional :: tol
+        real :: tolerance
+        logical :: is_equal
+        integer :: i
+        
+        tolerance = 1.0e-5
+        if (present(tol)) tolerance = tol
+        
+        is_equal = .true.
+        if (size(a) /= size(b)) then
+            is_equal = .false.
+            return
+        endif
+        
+        do i = 1, size(a)
+            if (abs(a(i) - b(i)) > tolerance) then
+                is_equal = .false.
+                return
+            endif
+        enddo
+    end function check_equal_vec
+end module utils_module
+
+! vec_add_cpu.f90
+module vec_add_cpu_module
+    implicit none
+contains
+    subroutine vec_add_cpu(a, b, c)
+        real, intent(in) :: a(:), b(:)
+        real, intent(out) :: c(:)
+        c = a + b
+    end subroutine vec_add_cpu
+end module vec_add_cpu_module
+
+! vec_add_module.cuf
+module vec_add_gpu_module
+    implicit none
+contains
+    attributes(global) subroutine vec_add_kernel(a, b, c, n)
+        real, intent(in) :: a(*), b(*)
+        real, intent(out) :: c(*)
+        integer, value :: n
+        integer :: idx
+        
+        idx = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+        
+        if (idx <= n) c(idx) = a(idx) + b(idx)
+    end subroutine vec_add_kernel
+    
+    subroutine vec_add_gpu(a, b, c, threads_per_block)
+        real, intent(in) :: a(:), b(:)
+        real, intent(out) :: c(:)
+        integer, intent(in), optional :: threads_per_block
+        
+        real, device, allocatable :: d_a(:), d_b(:), d_c(:)
+        type(dim3) :: grid, block
+        integer :: n, tpb, istat
+        
+        n = size(a)
+        tpb = 256
+        if (present(threads_per_block)) tpb = threads_per_block
+        
+        ! Выделение памяти на GPU
+        allocate(d_a(n), d_b(n), d_c(n), stat=istat)
+        if (istat /= 0) then
+            print *, "GPU memory allocation error"
+            stop
+        endif
+        
+        ! Копирование данных на GPU
+        d_a = a
+        d_b = b
+        
+        ! Конфигурация запуска ядра
+        block = dim3(tpb, 1, 1)
+        grid = dim3((n + tpb - 1) / tpb, 1, 1)
+        
+        ! Запуск ядра
+        call vec_add_kernel<<<grid, block>>>(d_a, d_b, d_c, n)
+        
+        ! Синхронизация и проверка ошибок
+        istat = cudaDeviceSynchronize()
+        if (istat /= 0) then
+            print *, "CUDA kernel launch error:", istat
+            stop
+        endif
+        
+        ! Копирование результата обратно
+        c = d_c
+        
+        ! Освобождение памяти GPU
+        deallocate(d_a, d_b, d_c)
+    end subroutine vec_add_gpu
+end module vec_add_gpu_module
+
+! main.f90
+program main
+    use utils_module
+    use vec_add_cpu_module
+    use vec_add_gpu_module
+    use cudafor
+    implicit none
+    
+    real, allocatable :: a(:), b(:), c_cpu(:), c_gpu(:)
+    integer :: l, i
+    real :: start_time, end_time, cpu_time, gpu_time
+    real :: gflops
+    integer :: istat
+    
+    ! Ввод размера вектора
+    print *, "Enter vector length l:"
+    read *, l
+    
+    if (l <= 0) then
+        print *, "Error: Vector length must be positive"
+        stop
+    endif
+    
+    ! Выделение памяти
+    allocate(a(l), b(l), c_cpu(l), c_gpu(l))
+    
+    ! Заполнение случайными числами
+    call rnd_fill(a)
+    call rnd_fill(b)
+    
+    print *, "Vector length:", l
+    print *, ""
+    
+    ! Вывод исходных векторов (если не слишком большие)
+    if (l <= 20) then
+        print *, "Vector A:"
+        do i = 1, l
+            write(*, '(F10.4)', advance='no') a(i)
+        end do
+        print *, ""
+        
+        print *, "Vector B:"
+        do i = 1, l
+            write(*, '(F10.4)', advance='no') b(i)
+        end do
+        print *, ""
+        print *, ""
+    else
+        print *, "Vectors too large to display (first 10 elements shown):"
+        print *, "A(1:10) =", a(1:10)
+        print *, "B(1:10) =", b(1:10)
+        print *, ""
+    endif
+    
+    ! CPU версия
+    call cpu_time(start_time)
+    call vec_add_cpu(a, b, c_cpu)
+    call cpu_time(end_time)
+    cpu_time = end_time - start_time
+    
+    print *, "=== CPU Results ==="
+    if (l <= 20) then
+        print *, "Result vector C = A + B:"
+        do i = 1, l
+            write(*, '(F10.4)', advance='no') c_cpu(i)
+        end do
+        print *, ""
+    else
+        print *, "C(1:10) =", c_cpu(1:10)
+    endif
+    print *, "CPU time:", cpu_time, "seconds"
+    
+    ! Вычисление GFLOPS для CPU
+    if (cpu_time > 0.0) then
+        gflops = real(l) / (cpu_time * 1.0e9)
+        print *, "CPU Performance:", gflops, "GFLOPS"
+    endif
+    print *, ""
+    
+    ! GPU версия
+    istat = cudaEventCreate(start_event)
+    istat = cudaEventCreate(stop_event)
+    
+    ! Прогрев GPU
+    call vec_add_gpu(a, b, c_gpu)
+    
+    ! Измерение времени GPU
+    call cpu_time(start_time)
+    call vec_add_gpu(a, b, c_gpu)
+    call cpu_time(end_time)
+    gpu_time = end_time - start_time
+    
+    print *, "=== GPU Results ==="
+    if (l <= 20) then
+        print *, "Result vector C = A + B:"
+        do i = 1, l
+            write(*, '(F10.4)', advance='no') c_gpu(i)
+        end do
+        print *, ""
+    else
+        print *, "C(1:10) =", c_gpu(1:10)
+    endif
+    print *, "GPU time:", gpu_time, "seconds"
+    
+    ! Вычисление GFLOPS для GPU
+    if (gpu_time > 0.0) then
+        gflops = real(l) / (gpu_time * 1.0e9)
+        print *, "GPU Performance:", gflops, "GFLOPS"
+    endif
+    print *, ""
+    
+    ! Проверка корректности
+    print *, "=== Verification ==="
+    if (check_equal_vec(c_cpu, c_gpu)) then
+        print *, "SUCCESS: CPU and GPU results match!"
+    else
+        print *, "ERROR: CPU and GPU results differ!"
+        if (l <= 20) then
+            print *, "Differences:"
+            do i = 1, l
+                if (abs(c_cpu(i) - c_gpu(i)) > 1.0e-5) then
+                    print *, "Element", i, ": CPU =", c_cpu(i), "GPU =", c_gpu(i)
+                endif
+            end do
+        endif
+    endif
+    
+    ! Сравнение производительности
+    if (cpu_time > 0.0 .and. gpu_time > 0.0) then
+        print *, ""
+        print *, "=== Performance Comparison ==="
+        print *, "Speedup (CPU/GPU):", cpu_time / gpu_time, "x"
+    endif
+    
+    ! Очистка
+    deallocate(a, b, c_cpu, c_gpu)
+    
+end program main

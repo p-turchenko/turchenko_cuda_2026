@@ -1,0 +1,57 @@
+module mat_add_module
+    use cudafor
+    implicit none
+    private
+    public :: mat_add_gpu
+
+contains
+
+    ! GPU-ядро: каждый поток обрабатывает один элемент матрицы (row, col).
+    attributes(global) subroutine mat_add_kernel(a, b, c, rows, cols)
+        implicit none
+        !----
+        real,    intent(in)  :: a(rows, *), b(rows, *)
+        real,    intent(out) :: c(rows, *)
+        integer, value       :: rows, cols
+        integer :: row, col
+        !----
+        row = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+        col = (blockIdx%y - 1) * blockDim%y + threadIdx%y
+        if (row <= rows .and. col <= cols) &
+            c(row, col) = a(row, col) + b(row, col)
+    end subroutine mat_add_kernel
+
+    ! Хост-обертка: H2D-копирование, запуск 2D-ядра и D2H-копирование.
+    subroutine mat_add_gpu(a, b, c, block_dim)
+        implicit none
+        !----
+        real,    intent(in)           :: a(:,:), b(:,:)
+        real,    intent(out)          :: c(:,:)
+        integer, intent(in), optional :: block_dim
+
+        real,    device, allocatable :: d_a(:,:), d_b(:,:), d_c(:,:)
+        type(dim3) :: grid, block
+        integer    :: rows, cols, bdim, istat
+        !----
+        rows = size(a, 1)
+        cols = size(a, 2)
+        bdim = 16
+        if (present(block_dim)) bdim = block_dim
+
+        allocate(d_a(rows, cols), d_b(rows, cols), d_c(rows, cols), stat=istat)
+        if (istat /= 0) then
+            write(*,'(a)') 'Memory allocation error in mat_add_gpu'
+            stop 1
+        end if
+        d_a = a
+        d_b = b
+
+        block = dim3(bdim, bdim, 1)
+        grid  = dim3((rows + bdim - 1) / bdim, (cols + bdim - 1) / bdim, 1)
+        call mat_add_kernel<<<grid, block>>>(d_a, d_b, d_c, rows, cols)
+
+        c = d_c
+        deallocate(d_a, d_b, d_c)
+    end subroutine mat_add_gpu
+
+end module mat_add_module

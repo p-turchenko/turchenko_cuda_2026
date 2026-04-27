@@ -1,0 +1,84 @@
+program rowl_plus_rowl_gpu
+    use cudafor
+    implicit none
+
+    integer :: l, i
+    real, allocatable :: A(:), B(:), C(:)
+    real, device, allocatable :: dA(:), dB(:), dC(:)
+
+    integer :: threads, blocks
+    real :: t1, t2
+
+    ! ===== Ввод =====
+    print *, "Enter vector length l:"
+    read *, l
+
+    ! ===== Выделение памяти =====
+    allocate(A(l), B(l), C(l))
+    allocate(dA(l), dB(l), dC(l))
+
+    ! ===== Генерация случайных чисел =====
+    call random_seed()
+    call random_number(A)
+    call random_number(B)
+
+    ! ===== Копирование на GPU =====
+    dA = A
+    dB = B
+
+    ! ===== Параметры запуска =====
+    threads = 256
+    blocks  = (l + threads - 1) / threads
+
+    call cpu_time(t1)
+
+    ! ===== Запуск ядра =====
+    call rowl_plus_rowl_gpu_kernel<<<blocks, threads>>>(dA, dB, dC, l)
+
+    call cudaDeviceSynchronize()
+
+    call cpu_time(t2)
+
+    ! ===== Копирование результата =====
+    C = dC
+
+    ! ===== Запись в файл =====
+    open(unit=10, file="output.txt", status="replace")
+
+    write(10,*) "Vector A:"
+    do i = 1, l
+        write(10,*) A(i)
+    end do
+
+    write(10,*) "Vector B:"
+    do i = 1, l
+        write(10,*) B(i)
+    end do
+
+    write(10,*) "Vector C = A + B:"
+    do i = 1, l
+        write(10,*) C(i)
+    end do
+
+    write(10,*) "Total time (s): ", t2 - t1
+
+    close(10)
+
+    print *, "Done. Results written to output.txt"
+
+end program rowl_plus_rowl_gpu
+
+
+attributes(global) subroutine rowl_plus_rowl_gpu_kernel(A, B, C, n)
+    implicit none
+    integer, value :: n
+    real, device :: A(n), B(n), C(n)
+
+    integer :: i
+
+    i = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+
+    if (i <= n) then
+        C(i) = A(i) + B(i)
+    end if
+end subroutine rowl_plus_rowl_gpu_kernel
